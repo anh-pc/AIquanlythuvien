@@ -11,9 +11,11 @@ ENV/
 .coverage
 htmlcov/
 
-# Node / Frontend
+# Node / Frontend / Packaging
 node_modules/
 src/frontend/dist/
+dist/
+*.zip
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

@@ -1,182 +1,17 @@
+import argparse
 from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
-from app.database import Base, SessionLocal, engine
-from app.models import Book, BorrowRecord, Category, Member
+from app.config import get_today
+from app.database import Base, SessionLocal, engine, ensure_schema_and_migrations
+from app.models import Book, BookCopy, BorrowRecord, Category, Loan, Member, Reader
+from seed_data import (
+    SEED_BOOKS,
+    SEED_CATEGORIES,
+    SEED_LOAN_TEMPLATES,
+    SEED_READERS,
+)
 
-SEED_CATEGORIES = [
-    {"name": "Công nghệ thông tin", "description": "Sách lập trình, kỹ thuật phần mềm, mạng máy tính và bảo mật."},
-    {"name": "Khoa học dữ liệu & AI", "description": "Trí tuệ nhân tạo, học máy, phân tích dữ liệu lớn."},
-    {"name": "Kinh tế & Quản trị", "description": "Quản trị kinh doanh, tài chính, quản lý dự án."},
-    {"name": "Văn học Việt Nam", "description": "Tác phẩm văn học kinh điển và đương đại Việt Nam."},
-    {"name": "Kỹ năng sống", "description": "Phát triển bản thân, tư duy phản biện, giao tiếp."},
-    {"name": "Khoa học tự nhiên", "description": "Toán học, vật lý, hoá học và sinh học ứng dụng."},
-    {"name": "Lịch sử & Địa lý", "description": "Lịch sử dân tộc, văn hoá và địa lý thế giới."},
-    {"name": "Ngoại ngữ", "description": "Tài liệu học tiếng Anh, tiếng Nhật chuyên ngành."},
-]
-
-SEED_BOOKS = [
-    {
-        "title": "Lập trình Python cơ bản",
-        "author": "Nguyễn Văn Minh",
-        "isbn": "978-604-001-001",
-        "publisher": "NXB Khoa học và Kỹ thuật",
-        "published_year": 2024,
-        "category_name": "Công nghệ thông tin",
-        "total_copies": 10,
-        "available_copies": 9,
-    },
-    {
-        "title": "Lập trình Python nâng cao cho Web",
-        "author": "Trần Quốc Bảo",
-        "isbn": "978-604-001-002",
-        "publisher": "NXB Thông tin và Truyền thông",
-        "published_year": 2025,
-        "category_name": "Công nghệ thông tin",
-        "total_copies": 6,
-        "available_copies": 6,
-    },
-    {
-        "title": "Kiến trúc Hệ thống Phân tán",
-        "author": "Lê Hoàng Nam",
-        "isbn": "978-604-001-003",
-        "publisher": "NXB Bách Khoa",
-        "published_year": 2024,
-        "category_name": "Công nghệ thông tin",
-        "total_copies": 5,
-        "available_copies": 5,
-    },
-    {
-        "title": "Cấu trúc dữ liệu và Giải thuật",
-        "author": "Phạm Gia Huy",
-        "isbn": "978-604-001-004",
-        "publisher": "NXB Đại học Quốc gia",
-        "published_year": 2023,
-        "category_name": "Công nghệ thông tin",
-        "total_copies": 8,
-        "available_copies": 8,
-    },
-    {
-        "title": "Thiết kế Cơ sở dữ liệu Quan hệ",
-        "author": "Đặng Thanh Tùng",
-        "isbn": "978-604-001-005",
-        "publisher": "NXB Khoa học và Kỹ thuật",
-        "published_year": 2023,
-        "category_name": "Công nghệ thông tin",
-        "total_copies": 7,
-        "available_copies": 7,
-    },
-    {
-        "title": "Bảo mật Ứng dụng Web Thực chiến",
-        "author": "Vũ Đình Khoa",
-        "isbn": "978-604-001-006",
-        "publisher": "NXB Thông tin và Truyền thông",
-        "published_year": 2025,
-        "category_name": "Công nghệ thông tin",
-        "total_copies": 4,
-        "available_copies": 4,
-    },
-    {
-        "title": "DevOps và Tự động hoá Triển khai",
-        "author": "Hoàng Minh Đức",
-        "isbn": "978-604-001-007",
-        "publisher": "NXB Bách Khoa",
-        "published_year": 2025,
-        "category_name": "Công nghệ thông tin",
-        "total_copies": 5,
-        "available_copies": 5,
-    },
-    {
-        "title": "Nhập môn Trí tuệ nhân tạo và Học máy",
-        "author": "Đỗ Quang Vinh",
-        "isbn": "978-604-002-001",
-        "publisher": "NXB Đại học Quốc gia",
-        "published_year": 2024,
-        "category_name": "Khoa học dữ liệu & AI",
-        "total_copies": 6,
-        "available_copies": 6,
-    },
-    {
-        "title": "Phân tích dữ liệu với Python và Pandas",
-        "author": "Ngô Thuỳ Linh",
-        "isbn": "978-604-002-002",
-        "publisher": "NXB Khoa học và Kỹ thuật",
-        "published_year": 2024,
-        "category_name": "Khoa học dữ liệu & AI",
-        "total_copies": 7,
-        "available_copies": 7,
-    },
-    {
-        "title": "Học sâu và Mạng Nơ-ron Nhân tạo",
-        "author": "Bùi Anh Tuấn",
-        "isbn": "978-604-002-003",
-        "publisher": "NXB Bách Khoa",
-        "published_year": 2025,
-        "category_name": "Khoa học dữ liệu & AI",
-        "total_copies": 4,
-        "available_copies": 4,
-    },
-    {
-        "title": "Quản trị Dự án Phần mềm Agile",
-        "author": "Lý Minh Châu",
-        "isbn": "978-604-003-001",
-        "publisher": "NXB Kinh tế",
-        "published_year": 2023,
-        "category_name": "Kinh tế & Quản trị",
-        "total_copies": 5,
-        "available_copies": 5,
-    },
-    {
-        "title": "Kinh tế học Vi mô Ứng dụng",
-        "author": "Phan Thanh Hà",
-        "isbn": "978-604-003-002",
-        "publisher": "NXB Kinh tế",
-        "published_year": 2022,
-        "category_name": "Kinh tế & Quản trị",
-        "total_copies": 6,
-        "available_copies": 6,
-    },
-    {
-        "title": "Truyện Kiều - Khảo cứu và Chú giải",
-        "author": "Nguyễn Du",
-        "isbn": "978-604-004-001",
-        "publisher": "NXB Văn học",
-        "published_year": 2021,
-        "category_name": "Văn học Việt Nam",
-        "total_copies": 9,
-        "available_copies": 9,
-    },
-    {
-        "title": "Dế Mèn Phiêu Lưu Ký",
-        "author": "Tô Hoài",
-        "isbn": "978-604-004-002",
-        "publisher": "NXB Kim Đồng",
-        "published_year": 2022,
-        "category_name": "Văn học Việt Nam",
-        "total_copies": 12,
-        "available_copies": 12,
-    },
-    {
-        "title": "Tư duy Phản biện trong Kỷ nguyên Số",
-        "author": "Trịnh Mai Hương",
-        "isbn": "978-604-005-001",
-        "publisher": "NXB Trẻ",
-        "published_year": 2024,
-        "category_name": "Kỹ năng sống",
-        "total_copies": 8,
-        "available_copies": 8,
-    },
-    {
-        "title": "Tiếng Anh Chuyên ngành Công nghệ",
-        "author": "Đinh Phương Thảo",
-        "isbn": "978-604-008-001",
-        "publisher": "NXB Giáo dục",
-        "published_year": 2024,
-        "category_name": "Ngoại ngữ",
-        "total_copies": 6,
-        "available_copies": 6,
-    },
-]
-
+# Giữ hằng số tương thích nếu có script cũ import
 SEED_MEMBERS = [
     {
         "member_code": "LIB001",
@@ -190,7 +25,7 @@ SEED_MEMBERS = [
         "member_code": "MEM001",
         "full_name": "Nguyễn Minh Tuấn",
         "email": "tuan.nm@student.edu.vn",
-        "phone": "0912345678",
+        "phone": "0912345601",
         "role": "member",
         "is_active": True,
     },
@@ -198,16 +33,43 @@ SEED_MEMBERS = [
         "member_code": "MEM002",
         "full_name": "Trần Thu Hà",
         "email": "ha.tt@student.edu.vn",
-        "phone": "0987654321",
+        "phone": "0912345602",
         "role": "member",
         "is_active": True,
     },
 ]
 
 
-def seed_database(db: Session) -> None:
-    Base.metadata.create_all(bind=engine)
+def sync_book_copy_counts(db: Session) -> None:
+    """Đồng bộ total_copies và available_copies trên bảng books từ bảng book_copies."""
+    books = db.query(Book).all()
+    for b in books:
+        copies = db.query(BookCopy).filter(BookCopy.book_id == b.id).all()
+        if copies:
+            b.total_copies = len(copies)
+            b.available_copies = sum(1 for c in copies if c.status == "available")
 
+
+def seed_database(db: Session, reset: bool = False) -> None:
+    """
+    Nạp dữ liệu mẫu cho hệ thống Quản lý Thư viện.
+    - Nếu reset=True: xoá dữ liệu hiện có trong DB của ứng dụng trước khi nạp lại.
+    - Nếu reset=False: bổ sung cộng thêm (idempotent), giữ nguyên dữ liệu đã có.
+    """
+    bind_engine = db.get_bind()
+    ensure_schema_and_migrations(bind_engine)
+
+    if reset:
+        db.query(Loan).delete()
+        db.query(BorrowRecord).delete()
+        db.query(BookCopy).delete()
+        db.query(Reader).delete()
+        db.query(Member).delete()
+        db.query(Book).delete()
+        db.query(Category).delete()
+        db.commit()
+
+    # 1. Nạp 10 thể loại
     category_map: dict[str, Category] = {}
     for cat_data in SEED_CATEGORIES:
         existing = db.query(Category).filter(Category.name == cat_data["name"]).first()
@@ -217,11 +79,16 @@ def seed_database(db: Session) -> None:
             db.flush()
         category_map[existing.name] = existing
 
-    book_map: dict[str, Book] = {}
-    for book_data in SEED_BOOKS:
+    # 2. Nạp 36 đầu sách và các bản sao (book_copies)
+    book_list: list[Book] = []
+    copy_map: dict[str, BookCopy] = {}
+
+    for idx, book_data in enumerate(SEED_BOOKS, start=1):
         existing_book = db.query(Book).filter(Book.isbn == book_data["isbn"]).first()
+        cat = category_map[book_data["category_name"]]
+        copies_count = book_data.get("copies_count", 2)
+
         if not existing_book:
-            cat = category_map[book_data["category_name"]]
             existing_book = Book(
                 title=book_data["title"],
                 author=book_data["author"],
@@ -229,14 +96,101 @@ def seed_database(db: Session) -> None:
                 publisher=book_data["publisher"],
                 published_year=book_data["published_year"],
                 category_id=cat.id,
-                total_copies=book_data["total_copies"],
-                available_copies=book_data["available_copies"],
+                total_copies=copies_count,
+                available_copies=copies_count,
                 is_deleted=False,
             )
             db.add(existing_book)
             db.flush()
-        book_map[existing_book.isbn] = existing_book
+        book_list.append(existing_book)
 
+        # Tạo bản sao cho đầu sách nếu chưa có
+        for copy_num in range(1, copies_count + 1):
+            barcode = f"BS-{idx:03d}-{copy_num:02d}"
+            existing_copy = db.query(BookCopy).filter(BookCopy.barcode == barcode).first()
+            if not existing_copy:
+                existing_copy = BookCopy(
+                    book_id=existing_book.id,
+                    barcode=barcode,
+                    status="available",
+                    note=f"Bản sao #{copy_num} của {existing_book.title}",
+                )
+                db.add(existing_copy)
+                db.flush()
+            copy_map[barcode] = existing_copy
+
+    # Đảm bảo mọi sách cũ trong DB (nếu được thêm ngoài seed) đều có ít nhất 1 bản sao
+    all_books_in_db = db.query(Book).all()
+    for b in all_books_in_db:
+        has_copy = db.query(BookCopy).filter(BookCopy.book_id == b.id).first()
+        if not has_copy:
+            auto_barcode = f"BS-AUTO-{b.id:04d}-01"
+            c = BookCopy(
+                book_id=b.id,
+                barcode=auto_barcode,
+                status="available",
+                note="Bản sao tự động đồng bộ từ dữ liệu cũ",
+            )
+            db.add(c)
+            db.flush()
+            copy_map[auto_barcode] = c
+
+    # 3. Nạp 12 độc giả (readers)
+    reader_map: dict[str, Reader] = {}
+    for r_data in SEED_READERS:
+        existing_reader = db.query(Reader).filter(Reader.card_no == r_data["card_no"]).first()
+        if not existing_reader:
+            existing_reader = Reader(**r_data)
+            db.add(existing_reader)
+            db.flush()
+        reader_map[existing_reader.card_no] = existing_reader
+
+    # 4. Nạp 22 phiếu mượn (loans) với ngày tương đối theo get_today()
+    today = get_today()
+    if db.query(Loan).count() == 0:
+        for tpl in SEED_LOAN_TEMPLATES:
+            reader = reader_map.get(tpl["card_no"])
+            copy_obj = copy_map.get(tpl["barcode"])
+            if not reader or not copy_obj:
+                continue
+
+            borrowed_date = (today + timedelta(days=tpl["borrowed_offset"])).isoformat()
+            due_date = (today + timedelta(days=tpl["due_offset"])).isoformat()
+            returned_date = (
+                (today + timedelta(days=tpl["returned_offset"])).isoformat()
+                if tpl["returned_offset"] is not None
+                else None
+            )
+
+            loan = Loan(
+                reader_id=reader.id,
+                copy_id=copy_obj.id,
+                borrowed_at=borrowed_date,
+                due_date=due_date,
+                returned_at=returned_date,
+                renew_count=tpl["renew_count"],
+                return_condition=tpl["return_condition"],
+                fine_amount=tpl["fine_amount"],
+                note=tpl["note"],
+            )
+            db.add(loan)
+
+            # Cập nhật trạng thái bản sao khớp với phiếu mượn
+            if returned_date is None:
+                copy_obj.status = "borrowed"
+            else:
+                if tpl["return_condition"] == "damaged":
+                    copy_obj.status = "damaged"
+                    copy_obj.note = "Bản sao bị hư hỏng khi trả"
+                elif tpl["return_condition"] == "lost":
+                    copy_obj.status = "lost"
+                    copy_obj.note = "Bản sao bị thất lạc"
+                else:
+                    copy_obj.status = "available"
+
+        db.flush()
+
+    # 5. Giữ dữ liệu bảng members & borrow_records cũ để tương thích ngược
     member_map: dict[str, Member] = {}
     for mem_data in SEED_MEMBERS:
         existing_mem = db.query(Member).filter(Member.member_code == mem_data["member_code"]).first()
@@ -246,14 +200,12 @@ def seed_database(db: Session) -> None:
             db.flush()
         member_map[existing_mem.member_code] = existing_mem
 
-    if db.query(BorrowRecord).count() == 0:
+    if db.query(BorrowRecord).count() == 0 and book_list and "MEM001" in member_map:
         now = datetime.now(timezone.utc)
-        first_book = book_map["978-604-001-001"]
-        first_member = member_map["MEM001"]
         db.add(
             BorrowRecord(
-                book_id=first_book.id,
-                member_id=first_member.id,
+                book_id=book_list[0].id,
+                member_id=member_map["MEM001"].id,
                 borrow_date=now - timedelta(days=3),
                 due_date=now + timedelta(days=11),
                 status="borrowed",
@@ -261,13 +213,44 @@ def seed_database(db: Session) -> None:
             )
         )
 
+    sync_book_copy_counts(db)
     db.commit()
 
 
-if __name__ == "__main__":
+def ensure_seeded_if_empty() -> None:
+    """Tự động nạp dữ liệu mẫu khi DB trống lúc khởi động ứng dụng."""
+    ensure_schema_and_migrations(engine)
     session = SessionLocal()
     try:
-        seed_database(session)
-        print("Seed dữ liệu mẫu thành công: 8 thể loại, 16 đầu sách, 3 tài khoản, 1 phiếu mượn.")
+        has_books = session.query(Book).count() > 0
+        has_readers = session.query(Reader).count() > 0
+        if not has_books or not has_readers:
+            seed_database(session, reset=False)
+    finally:
+        session.close()
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Nạp dữ liệu mẫu cho hệ thống AIquanlythuvien")
+    parser.add_argument(
+        "--reset",
+        action="store_true",
+        help="Xoá dữ liệu cũ trong DB ứng dụng và nạp lại từ đầu",
+    )
+    args = parser.parse_args()
+
+    session = SessionLocal()
+    try:
+        seed_database(session, reset=args.reset)
+        cat_count = session.query(Category).count()
+        book_count = session.query(Book).count()
+        copy_count = session.query(BookCopy).count()
+        reader_count = session.query(Reader).count()
+        loan_count = session.query(Loan).count()
+        print(
+            f"Seed dữ liệu mẫu thành công (reset={args.reset}): "
+            f"{cat_count} thể loại, {book_count} đầu sách, {copy_count} bản sao, "
+            f"{reader_count} độc giả, {loan_count} phiếu mượn."
+        )
     finally:
         session.close()

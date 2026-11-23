@@ -1,99 +1,157 @@
-# BÁO CÁO PHÂN TÍCH, THIẾT KẾ VÀ TRIỂN KHAI HỆ THỐNG QUẢN LÝ THƯ VIỆN (AIquanlythuvien)
+# BÁO CÁO BÀI THỰC HÀNH LAB 02
+## Đề tài: Phân tích, thiết kế và xây dựng hệ thống Quản lý Thư viện ứng dụng công cụ AI
+
+- **Họ và tên sinh viên:** `HoTen` *(Người dùng điền họ tên thật trước khi nộp)*
+- **Mã số sinh viên (MSSV):** `MSSV` *(Người dùng điền MSSV thật trước khi nộp)*
+- **Mã học phần / Bài thực hành:** LAB 02 — Quản lý Thư viện Số (`AIquanlythuvien`)
+- **Ngày hoàn thành:** 23/11/2026
+- **GitHub Repository:** https://github.com/anh-pc/AIquanlythuvien.git (nhánh `main`)
 
 ---
 
-## 1. Giới thiệu
+## PHẦN I — PHÂN TÍCH HỆ THỐNG
 
-### 1.1. Mục tiêu hệ thống
-**AIquanlythuvien** là hệ thống phần mềm quản lý thư viện hỗ trợ thủ thư quản lý danh mục đầu sách, phân loại theo thể loại, tra cứu – lọc sách theo thời gian thực, theo dõi nghiệp vụ mượn/trả sách của độc giả và tích hợp trợ lý AI gợi ý sách theo chủ đề học thuật.
+### 1. Bối cảnh & Mục tiêu
+Trong quy trình vận hành thư viện truyền thống bằng sổ sách hoặc bảng tính rời rạc, thủ thư thường gặp khó khăn khi cần kiểm soát chính xác từng cuốn sách vật lý (bản sao nào còn trên kệ, bản sao nào đang được độc giả mượn, bản sao nào bị rách/hư hỏng hay thất lạc). Ngoài ra, việc kiểm tra điều kiện mượn (độc giả có đang giữ sách quá hạn hay đã vượt số lượng sách tối đa chưa), tính số ngày trễ hạn và tra cứu lịch sử mượn tốn nhiều thời gian và dễ phát sinh sai sót.
 
-Trong phạm vi bài Lab này, hệ thống tập trung giải quyết trọn vẹn User Story trọng tâm phía quản trị:
-> *"Là thủ thư, tôi muốn dễ dàng xem và tìm kiếm để quản lý sách"* — triển khai trang quản lý sách phía quản trị với **tìm kiếm theo tên sách + lọc theo thể loại (danh mục)** đáp ứng đầy đủ các tiêu chí nghiệm thu **AC1–AC14** và tiêu chí trải nghiệm người dùng **UX1–UX7**.
+Hệ thống **AIquanlythuvien** được xây dựng nhằm số hoá toàn diện hoạt động quản trị thư viện:
+- Quản lý tách biệt giữa **Đầu sách (`books`)** và từng **Bản sao vật lý (`book_copies`)** theo mã vạch (`barcode`) và 4 trạng thái chuẩn.
+- Tự động hoá kiểm tra ràng buộc nghiệp vụ khi **Mượn – Trả – Gia hạn** sách trong giao dịch an toàn (ACID transaction).
+- Hỗ trợ tra cứu tức thời theo **tên sách hoặc tác giả** (xử lý chuẩn tiếng Việt có dấu Unicode NFC) kết hợp lọc theo thể loại và xem thống kê thời gian thực.
 
-### 1.2. Công nghệ sử dụng (nhận diện thực tế từ mã nguồn)
+---
 
-| Thành phần | Công nghệ / Thư viện | Phiên bản / Ghi chú |
+### 2. Danh sách chức năng
+
+Bảng dưới đây đối chiếu toàn bộ các chức năng trong hệ thống thực tế:
+
+| Mã | Chức năng | Người dùng | Mô tả | Ưu tiên | Trạng thái |
+|---|---|---|---|---|---|
+| **F1** | Quản lý đầu sách: xem, thêm, sửa, xoá mềm | Thủ thư | Xem danh sách đầu sách, thêm mới kèm số bản sao ban đầu, cập nhật thông tin và xoá mềm (`is_deleted=True`, chặn xoá khi có bản sao đang mượn). | M | **Đã làm** |
+| **F2** | Quản lý bản sao của đầu sách và tình trạng | Thủ thư | Xem các bản sao theo đầu sách, thêm bản sao mới, chuyển trạng thái giữa *Còn trong kho*, *Hư hỏng*, *Thất lạc* (chặn đổi tay sang/ra *Đang mượn*). | M | **Đã làm** |
+| **F3** | Quản lý độc giả: xem, thêm, sửa, vô hiệu hoá | Thủ thư | Quản lý hồ sơ thẻ độc giả (`card_no`), cập nhật liên hệ và khoá/mở thẻ (chặn vô hiệu hoá khi độc giả còn sách chưa trả). | M | **Đã làm** |
+| **F4** | Mượn sách | Thủ thư | Lập phiếu mượn mới cho độc giả hợp lệ trên bản sao *Còn trong kho*, tự tính hạn trả 14 ngày và chuyển bản sao sang *Đang mượn*. | M | **Đã làm** |
+| **F5** | Trả sách (bình thường / hư hỏng / thất lạc) | Thủ thư | Ghi nhận trả sách theo 3 tình trạng (`normal`, `damaged`, `lost`), cập nhật trạng thái bản sao tương ứng và chặn trả lần 2 (HTTP 409). | M | **Đã làm** |
+| **F6** | Gia hạn | Thủ thư | Gia hạn phiếu đang mượn chưa quá hạn thêm 7 ngày/lần, tối đa 2 lần gia hạn cho mỗi phiếu. | M | **Đã làm** |
+| **F7** | Tra cứu sách theo tên/tác giả + lọc thể loại + phân trang | Thủ thư | Tìm kiếm chuỗi con theo tên sách **hoặc** tác giả (không phân biệt hoa/thường tiếng Việt có dấu), lọc thể loại (AND) và phân trang. | M | **Đã làm** |
+| **F8** | Tìm độc giả + xem lịch sử mượn của độc giả | Thủ thư | Tìm độc giả theo tên/mã thẻ/SĐT/email và xem lịch sử toàn bộ phiếu mượn của độc giả có lọc theo trạng thái và phân trang. | M | **Đã làm** |
+| **F9** | Thống kê tổng quan | Thủ thư | Thống kê tổng đầu sách, số bản sao theo 4 trạng thái, số phiếu đang mượn, số phiếu quá hạn, số độc giả hoạt động và Top 5 sách mượn nhiều nhất. | M | **Đã làm** |
+| **F10** | Danh sách phiếu quá hạn + tính phí phạt | Thủ thư | Tự động nhận diện phiếu quá hạn theo ngày hiện tại, hiển thị số ngày trễ và tính phí phạt (`ngày trễ × 1.000 đ`). | S | **Đã làm** |
+| **F11** | Thể loại: dữ liệu seed + API tìm; thêm/sửa thể loại | Thủ thư | Seed sẵn 10 thể loại, API tìm thể loại cho combobox có `limit`, hỗ trợ thêm mới và cập nhật thể loại. | S / C | **Đã làm** |
+| **AI** | Trợ lý AI gợi ý sách theo chủ đề | Thủ thư | Gợi ý sách trong kho theo chủ đề nghiên cứu (tích hợp từ phiên trước, hoạt động offline qua fallback danh mục cục bộ khi không có API key). | Mở rộng | **Đã làm** |
+| **OUT1** | Đăng nhập / Phân quyền tài khoản | Thủ thư / Độc giả | Xác thực người dùng bằng mật khẩu/JWT (thuộc mục Không làm của đề). | — | **Chưa làm** |
+| **OUT2** | Đặt trước sách trực tuyến & Gửi Email/SMS | Độc giả | Đặt giữ chỗ sách từ xa và gửi thông báo nhắc hạn tự động (thuộc mục Không làm của đề). | — | **Chưa làm** |
+
+---
+
+### 3. Quy tắc nghiệp vụ (NV1–NV9) và Hằng số cấu hình
+
+Toàn bộ hằng số nghiệp vụ được tập trung tại một file duy nhất `src/backend/app/config.py`:
+- `LOAN_DAYS = 14` (Thời hạn mượn mặc định: 14 ngày)
+- `MAX_ACTIVE_LOANS = 5` (Số sách tối đa một độc giả được mượn cùng lúc)
+- `MAX_RENEWALS = 2` (Số lần gia hạn tối đa cho một phiếu mượn)
+- `RENEW_DAYS = 7` (Số ngày cộng thêm mỗi lần gia hạn)
+- `FINE_PER_DAY = 1000` (Đơn giá phí phạt trả trễ: 1.000 VNĐ/ngày)
+- Hàm lấy ngày hiện tại duy nhất: `get_today()` (hỗ trợ `set_today_override()` để kiểm thử tự động các kịch bản quá hạn/phí phạt).
+
+| Mã NV | Quy tắc nghiệp vụ chi tiết | Vị trí cài đặt trong code |
 |---|---|---|
-| **Backend Language & Framework** | Python + FastAPI | Python 3.13, FastAPI 0.115+, Uvicorn 0.30+ |
-| **ORM & Cơ sở dữ liệu** | SQLAlchemy 2.0 + SQLite | `sqlite:///./library.db` (tích hợp hàm Unicode `u_lower`) |
-| **Data Validation / DTO** | Pydantic v2 | `pydantic>=2.9.0`, `ConfigDict(from_attributes=True)` |
-| **Backend Automated Testing** | Pytest + FastAPI TestClient (HTTPX) | `pytest>=8.0.0`, SQLite in-memory isolated fixture |
-| **Frontend Stack** | Modular ES6+ SPA (Vanilla JS + CSS3) | Tách biệt `api/`, `types/`, `components/`, `views/`, `utils/` |
-| **Frontend Build / Lint / Test** | Node.js 22 Built-in Tooling | `npm run build`, `npm run lint`, `node --test` (`node:test`) |
-| **AI Integration** | Google Gemini API / Local Catalog Fallback | Biến môi trường `GEMINI_API_KEY`, `GEMINI_MODEL=gemini-1.5-flash` |
+| **NV1** | Chỉ cho phép mượn khi: độc giả tồn tại và `is_active=True`; bản sao tồn tại, `status='available'` và đầu sách `is_deleted=False`; số phiếu chưa trả của độc giả `< 5`; độc giả không có phiếu nào đang quá hạn. Khi thành công: tạo phiếu với `due_date = borrowed_at + 14 ngày`, bản sao chuyển sang `'borrowed'`. | `create_loan()` trong `src/backend/app/services/loan_service.py` |
+| **NV2** | Mượn và trả thực hiện trong một DB transaction; CSDL có Partial Unique Index `uq_loans_active_copy` trên `loans(copy_id) WHERE returned_at IS NULL` đảm bảo không bao giờ tồn tại 2 phiếu chưa trả trên cùng 1 bản sao. | `ensure_schema_and_migrations()` trong `database.py` & `loan_service.py` |
+| **NV3** | Trả sách yêu cầu phiếu chưa trả (`returned_at IS NULL`); nếu đã trả thì trả về lỗi **HTTP 409**. Nhận `return_condition` ∈ `{normal, damaged, lost}`, ghi `returned_at = today`, chuyển bản sao sang `available` / `damaged` / `lost`, tính `fine_amount = max(0, today - due_date) * 1000`. | `return_loan()` trong `src/backend/app/services/loan_service.py` |
+| **NV4** | Gia hạn chỉ áp dụng cho phiếu chưa trả, chưa quá hạn (`due_date >= today`) và `renew_count < 2`. Thành công: `due_date += 7 ngày`, `renew_count += 1`. | `renew_loan()` trong `src/backend/app/services/loan_service.py` |
+| **NV5** | Phiếu quá hạn được suy ra tự động khi `returned_at IS NULL` và `due_date < get_today()`; tính số ngày trễ `overdue_days = (today - due_date).days`. | `derive_loan_status()` trong `src/backend/app/services/loan_service.py` |
+| **NV6** | Không cho phép đổi thủ công trạng thái bản sao sang `'borrowed'` hoặc từ `'borrowed'` sang trạng thái khác. Chỉ cho đổi giữa `'available'`, `'damaged'`, `'lost'` khi bản sao không có phiếu mượn chưa trả. | `update_book_copy()` trong `src/backend/app/services/book_service.py` |
+| **NV7** | Đầu sách chỉ xoá mềm (`is_deleted=True`), chặn xoá nếu có bất kỳ bản sao nào đang được mượn. Độc giả chỉ vô hiệu hoá (`is_active=False`), chặn nếu còn phiếu chưa trả. Lịch sử mượn luôn được giữ nguyên. | `soft_delete_book()` (`book_service.py`) & `update_reader_status()` (`reader_service.py`) |
+| **NV8** | Lịch sử mượn của một độc giả hiển thị đầy đủ tên sách, mã bản sao, ngày mượn, hạn trả, ngày trả, trạng thái suy ra; hỗ trợ lọc theo trạng thái và phân trang. | `get_reader_loans()` (`routers/readers.py`) & `list_loans()` (`loan_service.py`) |
+| **NV9** | Thống kê tổng quan: tổng đầu sách chưa xoá, số bản sao theo 4 trạng thái, số phiếu đang mượn, số phiếu quá hạn, số độc giả hoạt động, và Top 5 đầu sách có số lượt mượn cao nhất. | `get_overview_stats()` trong `src/backend/app/services/stats_service.py` |
 
 ---
 
-## 2. Danh sách chức năng
+### 4. Sơ đồ quy trình Mượn / Trả / Gia hạn
 
-Bảng dưới đây liệt kê toàn bộ các chức năng dựa trên route/endpoint và giao diện thực tế trong repository:
+Các sơ đồ dưới đây phản ánh chính xác logic tại `src/backend/app/services/loan_service.py` và `src/backend/app/routers/loans.py`:
 
-| STT | Chức năng | Vai trò sử dụng | Mô tả | Trạng thái |
-|---|---|---|---|---|
-| 1 | Xem danh sách sách có phân trang | Thủ thư (Admin) | Hiển thị danh sách sách chưa xoá (`is_deleted=False`), kèm tên thể loại, tồn kho (`available_copies/total_copies`) và phân trang (`GET /api/books`). | **Đã có** |
-| 2 | Tìm kiếm sách theo tên sách | Thủ thư (Admin) | Tìm kiếm khớp chuỗi con (substring), không phân biệt hoa/thường (hỗ trợ tiếng Việt Unicode), tự động `trim()` khoảng trắng và escape ký tự `%`, `_` (`GET /api/books?keyword=...`). | **Đã có** |
-| 3 | Lọc sách theo thể loại & kết hợp tìm kiếm (AND) | Thủ thư (Admin) | Lọc sách theo `category_id` hoặc kết hợp đồng thời `keyword` VÀ `category_id`, tính lại `total` và `total_pages` sau khi lọc (`GET /api/books?keyword=...&category_id=...`). | **Đã có** |
-| 4 | Tìm kiếm thể loại từ Backend trong Dropdown | Thủ thư (Admin) | Dropdown thể loại cho phép gõ từ khoá để tìm trực tiếp từ backend với `limit` hợp lý, giữ nguyên thể loại đang chọn khi tìm (`GET /api/categories?keyword=...&limit=15`). | **Đã có** |
-| 5 | Xoá mềm sách (Soft Delete) | Thủ thư (Admin) | Đánh dấu `is_deleted=True` và ghi nhận `deleted_at`, loại bỏ sách đã xoá khỏi mọi truy vấn danh sách, tìm kiếm, lọc và tổng số bản ghi (`DELETE /api/books/{book_id}`). | **Đã có** |
-| 6 | Quản lý danh sách phiếu mượn | Thủ thư (Admin) | Xem danh sách toàn bộ phiếu mượn kèm thông tin sách, độc giả, ngày mượn, hạn trả, ngày trả thực tế và trạng thái (`GET /api/borrowings`). | **Đã có** |
-| 7 | Tạo phiếu mượn sách | Thủ thư (Admin) | Kiểm tra sách còn bản khả dụng (`available_copies > 0`), kiểm tra độc giả đang hoạt động (`is_active=True`), tạo phiếu mượn và trừ tồn kho (`POST /api/borrowings`). | **Đã có** |
-| 8 | Xác nhận trả sách & kiểm tra quá hạn | Thủ thư (Admin) | Ghi nhận `return_date`, đối chiếu với `due_date` để cập nhật trạng thái `returned` hoặc `overdue`, đồng thời hoàn lại số bản khả dụng (`POST /api/borrowings/{record_id}/return`). | **Đã có** |
-| 9 | Trợ lý AI gợi ý sách theo chủ đề | Thủ thư / Độc giả | Gợi ý các đầu sách phù hợp trong kho theo chủ đề quan tâm qua cấu hình Gemini hoặc chế độ đối sánh danh mục cục bộ (`POST /api/ai/recommend`). | **Đã có** |
-| 10 | Thêm mới / Cập nhật thông tin sách qua Form UI | Thủ thư (Admin) | Giao diện form thêm mới hoặc chỉnh sửa thông tin chi tiết đầu sách. | **Chưa có** |
-| 11 | Đăng nhập / Phân quyền xác thực JWT | Thủ thư / Độc giả | Xác thực phiên đăng nhập bằng mật khẩu và JWT token. | **Chưa có** |
-| 12 | Cổng tra cứu công khai & Đặt trước sách (Reservation) | Độc giả | Trang catalog riêng cho độc giả tự đặt lịch giữ sách trực tuyến. | **Chưa có** |
-| 13 | Tính và thu phí phạt quá hạn tự động | Thủ thư (Admin) | Quản lý biên lai thu tiền phạt theo số ngày trả trễ. | **Chưa có** |
-
----
-
-## 3. Sơ đồ quy trình Mượn/Trả
-
-Quy trình Mượn/Trả sách dưới đây được mô tả trực tiếp từ logic thực tế trong mã nguồn:
-- **File router:** `src/backend/app/routers/borrowings.py` (các hàm `get_borrowings`, `create_borrowing`, `return_borrowing`)
-- **File service:** `src/backend/app/services/borrowing_service.py` (các hàm `list_borrow_records`, `borrow_book`, `return_book`)
+#### 4.1. Sơ đồ quy trình Mượn sách (`POST /api/loans` → `create_loan`)
 
 ```mermaid
 flowchart TD
-    subgraph LUONG_MUON["Luồng Mượn Sách (POST /api/borrowings -> borrow_book)"]
-        M1["Nhận yêu cầu mượn: book_id, member_id, loan_days"] --> M2{"Tìm Book theo book_id\nvà is_deleted == False?"}
-        M2 -- "Không tồn tại" --> M_ERR1["Trả lỗi HTTP 404:\nKhông tìm thấy sách hoặc ngừng phục vụ"]
-        M2 -- "Tồn tại" --> M3{"Kiểm tra tồn kho:\navailable_copies > 0?"}
-        M3 -- "Hết sách (<= 0)" --> M_ERR2["Trả lỗi HTTP 400:\nSách hiện đã hết bản có sẵn"]
-        M3 -- "Còn sách" --> M4{"Tìm Member theo member_id\nvà is_active == True?"}
-        M4 -- "Không tồn tại / Bị khoá" --> M_ERR3["Trả lỗi HTTP 404 / 400:\nĐộc giả không hợp lệ"]
-        M4 -- "Hợp lệ" --> M5["Tạo BorrowRecord:\nstatus = 'borrowed'\ndue_date = borrow_date + loan_days"]
-        M5 --> M6["Cập nhật tồn kho:\nbook.available_copies -= 1\ndb.commit()"]
-        M6 --> M7["Trả về HTTP 200:\nBorrowRecordResponse"]
-    end
+    A["Nhận yêu cầu POST /api/loans (reader_id, copy_id)"] --> B{"Độc giả tồn tại và is_active == True?"}
+    B -- "Không" --> E1["Trả lỗi 404 / 400: Độc giả không tồn tại hoặc bị khoá"]
+    B -- "Có" --> C{"Bản sao tồn tại, sách chưa xoá và status == available?"}
+    C -- "Không" --> E2["Trả lỗi 404 / 400: Bản sao không khả dụng để mượn"]
+    C -- "Có" --> D{"Số phiếu chưa trả < 5 và không có phiếu quá hạn?"}
+    D -- "Không" --> E3["Trả lỗi 400: Vượt quá 5 cuốn hoặc đang có sách quá hạn"]
+    D -- "Có" --> F["Tạo Loan (due_date = today + 14 ngày)"]
+    F --> G["Cập nhật BookCopy.status = borrowed & commit transaction"]
+    G --> H["Trả về HTTP 201: LoanResponse"]
+```
 
-    subgraph LUONG_TRA["Luồng Trả Sách (POST /api/borrowings/{record_id}/return -> return_book)"]
-        T1["Nhận yêu cầu trả sách: record_id"] --> T2{"Tìm BorrowRecord\ntheo record_id?"}
-        T2 -- "Không tồn tại" --> T_ERR1["Trả lỗi HTTP 404:\nKhông tìm thấy phiếu mượn"]
-        T2 -- "Tồn tại" --> T3{"Phiếu đã trả trước đó?\n(return_date != None hoặc status == 'returned')"}
-        T3 -- "Đã trả" --> T_ERR2["Trả lỗi HTTP 400:\nPhiếu mượn đã được trả trước đó"]
-        T3 -- "Chưa trả" --> T4["Gán return_date = utc_now()"]
-        T4 --> T5{"Kiểm tra quá hạn:\nreturn_date > due_date?"}
-        T5 -- "Quá hạn" --> T6["status = 'overdue'\nGhi chú: 'Trả sách quá hạn'"]
-        T5 -- "Đúng hạn" --> T7["status = 'returned'"]
-        T6 --> T8["Hoàn tồn kho (nếu available < total):\nbook.available_copies += 1\ndb.commit()"]
-        T7 --> T8
-        T8 --> T9["Trả về HTTP 200:\nBorrowRecordResponse"]
-    end
+#### 4.2. Sơ đồ trình tự (Sequence Diagram) luồng Mượn sách
+
+```mermaid
+sequenceDiagram
+    actor TT as "Thủ thư"
+    participant UI as "LoansAdminView.js"
+    participant API as "POST /api/loans"
+    participant SVC as "loan_service.create_loan"
+    participant DB as "SQLite (loans, book_copies)"
+
+    TT->>UI: "Chọn độc giả, bản sao & nhấn Mượn sách"
+    UI->>API: "POST /api/loans {reader_id, copy_id}"
+    API->>SVC: "create_loan(db, payload)"
+    SVC->>DB: "Kiểm tra Reader, BookCopy, số phiếu đang mượn & quá hạn"
+    DB-->>SVC: "Hợp lệ (active_loans < 5, 0 quá hạn, copy available)"
+    SVC->>DB: "INSERT INTO loans & UPDATE book_copies SET status='borrowed'"
+    DB-->>SVC: "Commit thành công (uq_loans_active_copy đảm bảo duy nhất)"
+    SVC-->>API: "LoanResponse"
+    API-->>UI: "HTTP 201 Created"
+    UI-->>TT: "Hiển thị thông báo thành công & cập nhật bảng"
+```
+
+#### 4.3. Sơ đồ quy trình Trả sách (`POST /api/loans/{id}/return` → `return_loan`)
+
+```mermaid
+flowchart TD
+    R1["Nhận yêu cầu POST /api/loans/{id}/return (return_condition)"] --> R2{"Tìm thấy phiếu mượn?"}
+    R2 -- "Không" --> RE1["Trả lỗi 404: Không tìm thấy phiếu mượn"]
+    R2 -- "Có" --> R3{"Phiếu chưa trả (returned_at IS NULL)?"}
+    R3 -- "Đã trả trước đó" --> RE2["Trả lỗi HTTP 409: Không thể trả lần hai"]
+    R3 -- "Chưa trả" --> R4{"return_condition hợp lệ (normal / damaged / lost)?"}
+    R4 -- "Không" --> RE3["Trả lỗi 400: Tình trạng trả không hợp lệ"]
+    R4 -- "Hợp lệ" --> R5["Gán returned_at = today; fine_amount = max(0, today - due_date) * 1000"]
+    R5 --> R6["Cập nhật BookCopy.status: normal->available, damaged->damaged, lost->lost"]
+    R6 --> R7["Commit transaction & trả về HTTP 200: LoanResponse"]
+```
+
+#### 4.4. Sơ đồ quy trình Gia hạn (`POST /api/loans/{id}/renew` → `renew_loan`)
+
+```mermaid
+flowchart TD
+    N1["Nhận yêu cầu POST /api/loans/{id}/renew"] --> N2{"Phiếu tồn tại và returned_at IS NULL?"}
+    N2 -- "Không tồn tại / Đã trả" --> NE1["Trả lỗi 404 / 400: Phiếu không tồn tại hoặc đã trả"]
+    N2 -- "Đang mượn" --> N3{"Chưa quá hạn (due_date >= today)?"}
+    N3 -- "Đã quá hạn" --> NE2["Trả lỗi 400: Phiếu đã quá hạn, không thể gia hạn"]
+    N3 -- "Còn hạn" --> N4{"Số lần gia hạn renew_count < 2?"}
+    N4 -- "Đã đủ 2 lần" --> NE3["Trả lỗi 400: Đã đạt giới hạn gia hạn tối đa (2 lần)"]
+    N4 -- "Chưa đủ 2 lần" --> N5["Cập nhật due_date = due_date + 7 ngày; renew_count += 1"]
+    N5 --> N6["Commit & trả về HTTP 200: LoanResponse"]
 ```
 
 ---
 
-## 4. Bảng mô tả cấu trúc dữ liệu
+### 5. Cấu trúc dữ liệu
 
-Cấu trúc cơ sở dữ liệu được trích xuất trực tiếp từ `src/backend/app/models.py`.
+Mô hình dữ liệu được cài đặt tại `src/backend/app/models.py` trên SQLite với `PRAGMA foreign_keys = ON`.
 
-### 4.1. Sơ đồ quan hệ thực thể (ER Diagram)
+#### 5.1. Sơ đồ quan hệ thực thể (ER Diagram)
 
 ```mermaid
 erDiagram
-    CATEGORIES ||--o{ BOOKS : "phan_loai (category_id)"
-    BOOKS ||--o{ BORROW_RECORDS : "duoc_muon (book_id)"
-    MEMBERS ||--o{ BORROW_RECORDS : "thuc_hien_muon (member_id)"
+    CATEGORIES ||--o{ BOOKS : "phan_loai"
+    BOOKS ||--o{ BOOK_COPIES : "co_ban_sao"
+    READERS ||--o{ LOANS : "muon_sach"
+    BOOK_COPIES ||--o{ LOANS : "duoc_ghi_phieu"
 
     CATEGORIES {
         int id PK
@@ -117,185 +175,305 @@ erDiagram
         datetime created_at
     }
 
-    MEMBERS {
+    BOOK_COPIES {
         int id PK
-        string member_code UK
+        int book_id FK
+        string barcode UK
+        string status
+        string note
+        datetime created_at
+    }
+
+    READERS {
+        int id PK
+        string card_no UK
         string full_name
-        string email UK
         string phone
-        string role
+        string email UK
+        string address
         boolean is_active
         datetime created_at
     }
 
-    BORROW_RECORDS {
+    LOANS {
         int id PK
-        int book_id FK
-        int member_id FK
-        datetime borrow_date
-        datetime due_date
-        datetime return_date
-        string status
-        string notes
+        int reader_id FK
+        int copy_id FK
+        string borrowed_at
+        string due_date
+        string returned_at
+        int renew_count
+        string return_condition
+        int fine_amount
+        string note
     }
 ```
 
-### 4.2. Chi tiết các bảng dữ liệu
+#### 5.2. Mô tả chi tiết các bảng
 
-#### Bảng 1: `categories` (Thể loại sách)
-| Tên trường | Kiểu dữ liệu | Khoá (PK/FK/UNIQUE) | Ràng buộc | Mô tả |
+##### Bảng 1: `categories` (Thể loại sách)
+| Trường | Kiểu | Khoá (PK/FK/UNIQUE) | Ràng buộc | Mô tả |
 |---|---|---|---|---|
-| `id` | `Integer` | `PK` | `AUTOINCREMENT`, `NOT NULL` | Định danh duy nhất của thể loại |
-| `name` | `String(100)` | `UNIQUE` | `NOT NULL`, `INDEX` | Tên thể loại sách (ví dụ: `Công nghệ thông tin`) |
-| `description` | `String(255)` | — | `NULLABLE` | Mô tả chi tiết về nhóm thể loại |
-| `created_at` | `DateTime` | — | `NOT NULL`, Default `utc_now` | Thời điểm tạo bản ghi |
+| `id` | `Integer` | `PK` | `AUTOINCREMENT`, `NOT NULL` | Mã định danh thể loại |
+| `name` | `String(100)` | `UNIQUE` | `NOT NULL`, `INDEX` | Tên thể loại sách |
+| `description` | `String(255)` | — | `NULLABLE` | Mô tả thể loại |
+| `created_at` | `DateTime` | — | `NOT NULL`, Default `utc_now` | Thời điểm tạo |
 
-#### Bảng 2: `books` (Đầu sách)
-| Tên trường | Kiểu dữ liệu | Khoá (PK/FK/UNIQUE) | Ràng buộc | Mô tả |
+##### Bảng 2: `books` (Đầu sách)
+| Trường | Kiểu | Khoá (PK/FK/UNIQUE) | Ràng buộc | Mô tả |
 |---|---|---|---|---|
-| `id` | `Integer` | `PK` | `AUTOINCREMENT`, `NOT NULL` | Định danh duy nhất của sách |
-| `title` | `String(255)` | — | `NOT NULL`, `INDEX` | Tên sách (trường dùng để tìm kiếm theo keyword) |
-| `author` | `String(150)` | — | `NOT NULL` | Tên tác giả |
-| `isbn` | `String(20)` | `UNIQUE` | `NOT NULL` | Mã số sách tiêu chuẩn quốc tế ISBN |
+| `id` | `Integer` | `PK` | `AUTOINCREMENT`, `NOT NULL` | Mã định danh đầu sách |
+| `title` | `String(255)` | — | `NOT NULL`, `INDEX` | Tên đầu sách |
+| `author` | `String(150)` | — | `NOT NULL`, `INDEX` | Tên tác giả |
+| `isbn` | `String(30)` | `UNIQUE` | `NULLABLE` | Mã ISBN (tuỳ chọn) |
 | `publisher` | `String(150)` | — | `NULLABLE` | Nhà xuất bản |
 | `published_year` | `Integer` | — | `NULLABLE` | Năm xuất bản |
-| `category_id` | `Integer` | `FK -> categories.id` | `NOT NULL`, `INDEX` | Khoá ngoại liên kết tới bảng `categories` |
-| `total_copies` | `Integer` | — | `NOT NULL`, Default `1` | Tổng số bản sách có trong thư viện |
-| `available_copies` | `Integer` | — | `NOT NULL`, Default `1` | Số bản sách hiện có sẵn để cho mượn |
-| `is_deleted` | `Boolean` | — | `NOT NULL`, Default `False`, `INDEX` | Cờ đánh dấu xoá mềm (`True` = đã xoá) |
-| `deleted_at` | `DateTime` | — | `NULLABLE` | Thời điểm thực hiện xoá mềm |
+| `category_id` | `Integer` | `FK -> categories.id` | `NOT NULL`, `INDEX` | Thể loại của đầu sách |
+| `total_copies` | `Integer` | — | `NOT NULL`, Default `1` | Tổng số bản sao của đầu sách |
+| `available_copies` | `Integer` | — | `NOT NULL`, Default `1` | Số bản sao đang còn trong kho |
+| `is_deleted` | `Boolean` | — | `NOT NULL`, Default `False`, `INDEX` | Cờ xoá mềm (`False`=đang phục vụ, `True`=đã xoá) |
+| `deleted_at` | `DateTime` | — | `NULLABLE` | Thời điểm xoá mềm |
 | `created_at` | `DateTime` | — | `NOT NULL`, Default `utc_now` | Thời điểm tạo đầu sách |
 
-#### Bảng 3: `members` (Độc giả & Thủ thư)
-| Tên trường | Kiểu dữ liệu | Khoá (PK/FK/UNIQUE) | Ràng buộc | Mô tả |
+##### Bảng 3: `book_copies` (Bản sao vật lý của đầu sách)
+| Trường | Kiểu | Khoá (PK/FK/UNIQUE) | Ràng buộc | Mô tả |
 |---|---|---|---|---|
-| `id` | `Integer` | `PK` | `AUTOINCREMENT`, `NOT NULL` | Định danh người dùng/độc giả |
-| `member_code` | `String(30)` | `UNIQUE` | `NOT NULL`, `INDEX` | Mã thẻ thư viện (ví dụ: `LIB001`, `MEM001`) |
-| `full_name` | `String(150)` | — | `NOT NULL` | Họ và tên |
-| `email` | `String(150)` | `UNIQUE` | `NOT NULL` | Địa chỉ email liên hệ |
-| `phone` | `String(20)` | — | `NULLABLE` | Số điện thoại |
-| `role` | `String(20)` | — | `NOT NULL`, Default `'member'` | Vai trò: `'librarian'` (thủ thư) hoặc `'member'` (độc giả) |
-| `is_active` | `Boolean` | — | `NOT NULL`, Default `True` | Trạng thái hoạt động của thẻ |
-| `created_at` | `DateTime` | — | `NOT NULL`, Default `utc_now` | Thời điểm đăng ký |
+| `id` | `Integer` | `PK` | `AUTOINCREMENT`, `NOT NULL` | Mã định danh bản sao |
+| `book_id` | `Integer` | `FK -> books.id` | `NOT NULL`, `INDEX` | Đầu sách mà bản sao này thuộc về |
+| `barcode` | `String(50)` | `UNIQUE` | `NOT NULL`, `INDEX` | Mã vạch định danh bản sao (ví dụ: `BS-001-01`) |
+| `status` | `String(20)` | — | `NOT NULL`, `CHECK (status IN ('available','borrowed','damaged','lost'))` | Tình trạng: `available` (Còn trong kho), `borrowed` (Đang mượn), `damaged` (Hư hỏng), `lost` (Thất lạc) |
+| `note` | `String(255)` | — | `NULLABLE` | Ghi chú tình trạng bản sao |
+| `created_at` | `DateTime` | — | `NOT NULL`, Default `utc_now` | Thời điểm nhập bản sao |
 
-#### Bảng 4: `borrow_records` (Phiếu mượn / trả sách)
-| Tên trường | Kiểu dữ liệu | Khoá (PK/FK/UNIQUE) | Ràng buộc | Mô tả |
+##### Bảng 4: `readers` (Độc giả)
+| Trường | Kiểu | Khoá (PK/FK/UNIQUE) | Ràng buộc | Mô tả |
+|---|---|---|---|---|
+| `id` | `Integer` | `PK` | `AUTOINCREMENT`, `NOT NULL` | Mã định danh độc giả |
+| `card_no` | `String(30)` | `UNIQUE` | `NOT NULL`, `INDEX` | Mã số thẻ thư viện (ví dụ: `DG001`) |
+| `full_name` | `String(150)` | — | `NOT NULL`, `INDEX` | Họ và tên độc giả |
+| `phone` | `String(25)` | — | `NULLABLE` | Số điện thoại liên hệ |
+| `email` | `String(150)` | `UNIQUE` | `NULLABLE` | Địa chỉ email |
+| `address` | `String(255)` | — | `NULLABLE` | Địa chỉ liên hệ |
+| `is_active` | `Boolean` | — | `NOT NULL`, Default `True`, `INDEX` | Trạng thái thẻ (`True`=Đang hoạt động, `False`=Đã vô hiệu hoá) |
+| `created_at` | `DateTime` | — | `NOT NULL`, Default `utc_now` | Thời điểm cấp thẻ |
+
+##### Bảng 5: `loans` (Phiếu mượn / trả / gia hạn)
+| Trường | Kiểu | Khoá (PK/FK/UNIQUE) | Ràng buộc | Mô tả |
 |---|---|---|---|---|
 | `id` | `Integer` | `PK` | `AUTOINCREMENT`, `NOT NULL` | Mã phiếu mượn |
-| `book_id` | `Integer` | `FK -> books.id` | `NOT NULL`, `INDEX` | Đầu sách được mượn |
-| `member_id` | `Integer` | `FK -> members.id` | `NOT NULL`, `INDEX` | Độc giả mượn sách |
-| `borrow_date` | `DateTime` | — | `NOT NULL`, Default `utc_now` | Thời điểm mượn sách |
-| `due_date` | `DateTime` | — | `NOT NULL` | Hạn phải trả sách |
-| `return_date` | `DateTime` | — | `NULLABLE` | Thời điểm trả sách thực tế (`NULL` nếu chưa trả) |
-| `status` | `String(20)` | — | `NOT NULL`, Default `'borrowed'`, `INDEX` | Trạng thái: `'borrowed'`, `'returned'`, `'overdue'` |
-| `notes` | `String(255)` | — | `NULLABLE` | Ghi chú phiếu mượn / ghi chú quá hạn |
+| `reader_id` | `Integer` | `FK -> readers.id` | `NOT NULL`, `INDEX` | Độc giả thực hiện mượn |
+| `copy_id` | `Integer` | `FK -> book_copies.id` | `NOT NULL`, `INDEX`, Partial Unique `uq_loans_active_copy (WHERE returned_at IS NULL)` | Bản sao sách được mượn |
+| `borrowed_at` | `String(10)` | — | `NOT NULL`, ISO `YYYY-MM-DD` | Ngày mượn sách |
+| `due_date` | `String(10)` | — | `NOT NULL`, ISO `YYYY-MM-DD` | Hạn phải trả sách |
+| `returned_at` | `String(10)` | — | `NULLABLE`, ISO `YYYY-MM-DD` | Ngày trả thực tế (`NULL` nếu chưa trả) |
+| `renew_count` | `Integer` | — | `NOT NULL`, Default `0` | Số lần đã gia hạn (`0..2`) |
+| `return_condition` | `String(20)` | — | `NULLABLE`, `CHECK (IN ('normal','damaged','lost'))` | Tình trạng sách khi trả |
+| `fine_amount` | `Integer` | — | `NOT NULL`, Default `0` | Phí phạt trả trễ thực tế (VNĐ) |
+| `note` | `String(255)` | — | `NULLABLE` | Ghi chú phiếu mượn |
+
+> **Cơ chế suy ra trạng thái phiếu mượn (`derive_loan_status` trong `loan_service.py`):**
+> Bảng `loans` **không lưu cột `status` cố định** để tránh sai lệch dữ liệu khi qua ngày mới. Thay vào đó, trạng thái được suy ra động tại thời điểm truy vấn dựa trên `returned_at`, `due_date` và `get_today()`:
+> 1. Nếu `returned_at IS NOT NULL` → **`returned` ("Đã trả")**.
+> 2. Nếu `returned_at IS NULL` và `due_date < get_today()` → **`overdue` ("Quá hạn")**, số ngày trễ `overdue_days = (get_today() - due_date).days`, phí phạt tạm tính `estimated_fine = overdue_days * 1000`.
+> 3. Nếu `returned_at IS NULL` và `due_date >= get_today()` → **`borrowed` ("Đang mượn")**.
 
 ---
 
-## 5. Tính năng tìm kiếm & lọc sách (Phần A)
+## PHẦN II — TRIỂN KHAI & KIỂM THỬ
 
-### 5.1. Mô tả tham số API
+### 1. Công nghệ & Kiến trúc hệ thống
 
-#### Endpoint 1: `GET /api/books` (Danh sách sách có tìm kiếm, lọc thể loại và phân trang)
-| Tham số | Kiểu | Bắt buộc / Tuỳ chọn | Mặc định | Ràng buộc / Mô tả |
-|---|---|---|---|---|
-| `keyword` | `string` | Tuỳ chọn | `None` | Từ khoá tìm kiếm theo **tên sách** (`Book.title`). |
-| `category_id` | `integer` | Tuỳ chọn | `None` | ID thể loại dùng để lọc sách (`Book.category_id`). Sai kiểu trả về HTTP 422. |
-| `page` | `integer` | Tuỳ chọn | `1` | Số thứ tự trang hiện tại (`ge=1`). |
-| `page_size` | `integer` | Tuỳ chọn | `5` | Số lượng sách mỗi trang (`ge=1, le=100`). |
+- **Backend:** Python 3.13 + FastAPI + SQLAlchemy 2.0 + SQLite (`library.db`).
+- **Frontend:** HTML5 / CSS3 / Modular ES6 JavaScript thuần (`src/frontend/`), được chính FastAPI phục vụ tĩnh tại `/` và `/src/*` (chạy hoàn toàn offline, không phụ thuộc CDN hay dịch vụ đám mây ngoài), đồng thời hỗ trợ chạy dev server riêng qua Node.js (`npm run dev`).
+- **Automated Testing:** `pytest` + `fastapi.testclient` (35 integration tests trên SQLite in-memory riêng biệt) và `node --test` (4 unit tests cho frontend helper).
 
-#### Endpoint 2: `GET /api/categories` (Tìm kiếm danh sách thể loại cho Dropdown)
-| Tham số | Kiểu | Bắt buộc / Tuỳ chọn | Mặc định | Ràng buộc / Mô tả |
-|---|---|---|---|---|
-| `keyword` | `string` | Tuỳ chọn | `None` | Từ khoá tìm kiếm theo **tên thể loại** (`Category.name`). |
-| `limit` | `integer` | Tuỳ chọn | `20` | Giới hạn số lượng thể loại trả về (`ge=1, le=100`, Frontend gọi với `limit=15`). |
-
-### 5.2. Quy tắc chuẩn hoá Keyword & Các trường hợp đặc biệt (`src/backend/app/utils/search.py`)
-1. **Cắt khoảng trắng (`trim`)**: Mọi chuỗi `keyword` đều được `.strip()` ở đầu và cuối. Nếu chuỗi sau khi `strip()` là rỗng (`""`) hoặc ban đầu chỉ chứa khoảng trắng (`"   "`, `"\t\n"`), hàm `normalize_keyword()` trả về `None` để bỏ qua điều kiện lọc.
-2. **Khớp chuỗi con không phân biệt hoa/thường (Unicode Case-insensitive Substring)**:
-   - Đăng ký hàm SQLite UDF `u_lower` qua SQLAlchemy connection listener (`src/backend/app/database.py`), đảm bảo chuyển chữ thường chính xác cho cả ký tự tiếng Việt có dấu (ví dụ `"LẬP TRÌNH PYTHON"` khớp `"Lập trình Python cơ bản"`).
-3. **Escape ký tự đại diện (`%`, `_`, `\`)**:
-   - Hàm `escape_like_literal()` chuyển `\` thành `\\`, `%` thành `\%`, và `_` thành `\_`, kết hợp với mệnh đề `LIKE ... ESCAPE '\'`.
-   - Nhờ đó các từ khoá chứa `%`, `_`, `100%` được tìm kiếm theo đúng nghĩa ký tự literal, tuyệt đối không bị hiểu nhầm là wildcard lấy toàn bộ bảng.
-4. **Kết hợp điều kiện và loại trừ sách đã xoá**:
-   - Mọi truy vấn trên bảng `Book` luôn có điều kiện nền `Book.is_deleted.is_(False)`.
-   - Khi truyền đồng thời `keyword` và `category_id`, hai điều kiện được nối bằng phép **AND** trước khi tính `total = query.count()` và `total_pages = ceil(total / page_size)`.
+```mermaid
+flowchart LR
+    UI["Giao diện Web (4 màn hình: Tổng quan, Sách, Độc giả, Mượn/Trả)"] --> ROUTER["FastAPI Routers (/api/*)"]
+    ROUTER --> SVC["Tầng Service Nghiệp vụ (book, category, reader, loan, stats)"]
+    SVC --> NORM["Chuẩn hoá Keyword (Unicode NFC + u_casefold + Escape LIKE)"]
+    SVC --> DB[("SQLite DB (PRAGMA foreign_keys=ON + Partial Unique Index)")]
+```
 
 ---
 
-## 6. Quá trình sử dụng Google AI Studio / Antigravity IDE
+### 2. Bảng API tóm tắt
 
-### 6.1. Quy trình làm việc với AI
-1. **Khảo sát & Thiết kế cấu trúc (Phase 0 – Phase 1)**: Sử dụng Antigravity IDE để kiểm tra môi trường runtime (Python 3.13, Node.js 22, Git), thiết kế mô hình dữ liệu 4 bảng (`categories`, `books`, `members`, `borrow_records`) và định nghĩa hợp đồng API đáp ứng AC1–AC14.
-2. **Triển khai Backend & Kiểm thử tự động (Phase 2 – Phase 3)**: Yêu cầu AI sinh tầng dịch vụ tìm kiếm chuẩn hoá `normalize_keyword` + `escape_like_literal`, sau đó viết bộ 17 automated integration tests bằng `pytest` kiểm chứng từng tiêu chí AC1–AC7.
-3. **Triển khai Frontend & Tối ưu UX (Phase 4 – Phase 5)**: Xây dựng giao diện Quản lý Sách với debounce 300ms, xử lý race condition bằng `AbortController` + token, hỗ trợ phím `Enter` tìm ngay, điều hướng bàn phím trong dropdown thể loại và kiểm tra responsive ở kích thước `375px`.
-4. **Kiểm chứng chéo (Verification)**: Mọi đoạn mã do AI đề xuất đều được chạy kiểm chứng thực tế qua `pytest`, `npm run lint`, `npm run build`, `npm test` và thao tác trực tiếp trên trình duyệt.
+Mọi API danh sách đều trả về cấu trúc thống nhất `{items, total, page, page_size, total_pages}`. Lỗi nghiệp vụ trả về `{detail: "<thông báo tiếng Việt>"}`.
 
-### 6.2. Các vị trí chèn ảnh chụp màn hình quá trình làm việc với AI (do người dùng tự chụp)
-
-> 📷 **[CẦN CHÈN ẢNH — người dùng tự chụp]** `docs/screenshots/ai_01_prompt.png` — Màn hình prompt yêu cầu ban đầu gửi cho Antigravity IDE.
-
-> 📷 **[CẦN CHÈN ẢNH — người dùng tự chụp]** `docs/screenshots/ai_02_plan.png` — Màn hình danh sách các bước thực hiện (Steps / Task Checklist) của Antigravity IDE.
-
-> 📷 **[CẦN CHÈN ẢNH — người dùng tự chụp]** `docs/screenshots/ai_03_test_results.png` — Màn hình terminal trong Antigravity IDE hiển thị kết quả chạy 17/17 test backend (`pytest`) và 3/3 test frontend (`npm test`).
-
-> 📷 **[CẦN CHÈN ẢNH — người dùng tự chụp]** `docs/screenshots/ai_04_git_diff.png` — Màn hình kiểm tra thay đổi mã nguồn (`git status` / `git diff`) trên Antigravity IDE trước khi commit.
-
-> 📷 **[CẦN CHÈN ẢNH — người dùng tự chụp]** `docs/screenshots/ai_05_ai_studio.png` — Màn hình thử nghiệm prompt hoặc cấu hình API trên Google AI Studio (nếu có sử dụng).
-
----
-
-## 7. Ảnh chụp ứng dụng khi chạy
-
-> **Ghi chú trung thực từ môi trường thực thi:** Backend (`http://127.0.0.1:8000`) và Frontend (`http://127.0.0.1:5173`) đã khởi chạy thành công, tuy nhiên công cụ trình duyệt tự động bị chặn do Chrome trên máy chưa bật `DevToolsActivePort` (`C:\Users\DELL\AppData\Local\Google\Chrome\User Data\DevToolsActivePort` ENOENT). Do đó các ảnh chụp giao diện ứng dụng dưới đây được đặt ở dạng **placeholder (chưa chụp tự động)** để người dùng chụp trực tiếp khi mở `http://127.0.0.1:5173`:
-
-> 📷 **[CẦN CHÈN ẢNH — chưa chụp tự động do thiếu Chrome DevToolsActivePort]** `docs/screenshots/app_01_books_list.png` — Màn hình danh sách sách mặc định (`Tìm thấy 16 sách`, phân trang 5 sách/trang, dropdown `Tất cả thể loại`, nút `Xoá bộ lọc` ở trạng thái disabled).
-
-> 📷 **[CẦN CHÈN ẢNH — chưa chụp tự động do thiếu Chrome DevToolsActivePort]** `docs/screenshots/app_02_search_keyword.png` — Màn hình tìm kiếm sách với từ khoá `Python` (`Tìm thấy 3 sách`: *"Lập trình Python cơ bản"*, *"Lập trình Python nâng cao cho Web"*, *"Phân tích dữ liệu với Python và Pandas"*).
-
-> 📷 **[CẦN CHÈN ẢNH — chưa chụp tự động do thiếu Chrome DevToolsActivePort]** `docs/screenshots/app_03_filter_category.png` — Màn hình gõ tìm và chọn thể loại `Công nghệ thông tin` trong searchable dropdown (hiển thị 7 sách thuộc thể loại `Công nghệ thông tin` hoặc 2 sách khi kết hợp với từ khoá `Python`).
-
-> 📷 **[CẦN CHÈN ẢNH — chưa chụp tự động do thiếu Chrome DevToolsActivePort]** `docs/screenshots/app_04_empty_state.png` — Màn hình trạng thái rỗng hiển thị đúng thông báo `Không tìm thấy sách phù hợp` kèm gợi ý hành động khi nhập từ khoá không khớp.
-
-> 📷 **[CẦN CHÈN ẢNH — chưa chụp tự động do thiếu Chrome DevToolsActivePort]** `docs/screenshots/app_05_borrowings.png` — Màn hình tab `Mượn / Trả` hiển thị danh sách phiếu mượn mẫu của độc giả `Nguyễn Minh Tuấn (MEM001)`.
+| Phương thức & Đường dẫn | Mô tả chức năng | Mã trả về chính |
+|---|---|---|
+| `GET /api/categories?q=&limit=20` | Tìm kiếm danh sách thể loại từ backend (hỗ trợ cả `q` và `keyword`) | `200 OK` |
+| `POST /api/categories` | Thêm thể loại mới (kiểm tra trùng tên không phân biệt hoa/thường) | `201 Created`, `400` |
+| `PUT /api/categories/{id}` | Cập nhật tên/mô tả thể loại | `200 OK`, `400`, `404` |
+| `GET /api/books?q=&category_id=&page=1&page_size=10` | Tra cứu đầu sách theo **tên sách hoặc tác giả** (`q`), lọc `category_id` (AND) | `200 OK`, `422` |
+| `POST /api/books` | Thêm đầu sách mới kèm tạo tự động `initial_copies` bản sao | `201 Created`, `400`, `404` |
+| `GET /api/books/{id}` | Xem chi tiết đầu sách kèm danh sách bản sao | `200 OK`, `404` |
+| `PUT /api/books/{id}` | Cập nhật thông tin đầu sách | `200 OK`, `400`, `404` |
+| `DELETE /api/books/{id}` | Xoá mềm đầu sách (chặn nếu có bản sao đang mượn - NV7) | `200 OK`, `400`, `404` |
+| `GET /api/books/{id}/copies` | Danh sách bản sao của một đầu sách | `200 OK`, `404` |
+| `POST /api/books/{id}/copies` | Thêm bản sao mới cho đầu sách | `201 Created`, `400`, `404` |
+| `GET /api/copies?q=&status=&book_id=` | Tìm kiếm bản sao theo mã vạch hoặc tên sách (phục vụ lập phiếu mượn) | `200 OK` |
+| `PATCH /api/copies/{id}` | Đổi tình trạng bản sao giữa `available`/`damaged`/`lost` (chặn `borrowed` - NV6) | `200 OK`, `400`, `404` |
+| `GET /api/readers?q=&is_active=&page=1&page_size=10` | Tìm kiếm và lọc danh sách độc giả | `200 OK` |
+| `POST /api/readers` | Thêm độc giả mới (tự sinh mã thẻ `DGxxx` nếu để trống) | `201 Created`, `400` |
+| `GET /api/readers/{id}` | Xem chi tiết độc giả | `200 OK`, `404` |
+| `PUT /api/readers/{id}` | Cập nhật thông tin độc giả | `200 OK`, `400`, `404` |
+| `PATCH /api/readers/{id}/status` | Vô hiệu hoá / kích hoạt độc giả (chặn vô hiệu hoá khi còn sách chưa trả - NV7) | `200 OK`, `400`, `404` |
+| `GET /api/readers/{id}/loans?status=&page=1` | Lịch sử mượn sách của một độc giả có lọc trạng thái và phân trang (NV8) | `200 OK`, `404` |
+| `GET /api/loans?status=&q=&reader_id=&page=1` | Danh sách phiếu mượn, lọc theo trạng thái suy ra (`borrowed`, `overdue`, `returned`) | `200 OK` |
+| `POST /api/loans` | Lập phiếu mượn sách mới (kiểm tra đầy đủ NV1, NV2) | `201 Created`, `400`, `404`, `409` |
+| `POST /api/loans/{id}/return` | Trả sách với `return_condition` (`normal`/`damaged`/`lost`), tính phí phạt (NV3) | `200 OK`, `400`, `404`, `409` |
+| `POST /api/loans/{id}/renew` | Gia hạn phiếu mượn thêm 7 ngày, tối đa 2 lần (NV4) | `200 OK`, `400`, `404` |
+| `GET /api/stats` | Thống kê tổng quan toàn thư viện (NV9) | `200 OK` |
 
 ---
 
-## 8. Kết quả kiểm thử
+### 3. Tính năng tra cứu & Chuẩn hoá Keyword (`src/backend/app/utils/search.py`)
 
-### 8.1. Tổng hợp số lượng test
-- **Backend Automated Tests (`pytest`):** `17 passed in 0.97s` (0 failed, 0 skipped).
-- **Frontend Automated Logic Tests (`npm test`):** `3 passed` (0 failed).
-- **Frontend Lint & Build (`npm run lint && npm run build`):** Thành công 100% (9 modules checked).
-
-### 8.2. Bảng ánh xạ AC → Kiểm thử
-
-| Mã AC | Nội dung yêu cầu | Hàm test / Phương thức kiểm chứng | Kết quả |
-|---|---|---|---|
-| **AC1** | Tìm theo tên sách (substring, không phân biệt hoa/thường, trim, rỗng/whitespace) | `test_ac1_search_by_title_normalized_matches_seed_book` (5 biến thể), `test_ac1_empty_or_whitespace_keyword_does_not_filter` (3 biến thể) | **PASS** |
-| **AC2** | Lọc theo `category_id` chỉ trả về sách thuộc thể loại đó | `test_ac2_filter_by_category_id` | **PASS** |
-| **AC3** | Kết hợp `keyword` + `category_id` theo logic AND | `test_ac3_combine_keyword_and_category_uses_and_logic` | **PASS** |
-| **AC4** | `total` và `total_pages` tính sau khi áp dụng mọi filter; phân trang chính xác | `test_ac4_total_and_pagination_calculated_after_filters` | **PASS** |
-| **AC5** | Keyword không khớp hoặc `category_id` không tồn tại trả về HTTP 200 + danh sách rỗng | `test_ac5_non_matching_keyword_or_non_existent_category_returns_200_empty` | **PASS** |
-| **AC6** | Ký tự `%`, `_`, `100%` được escape và tìm đúng nghĩa literal | `test_ac6_special_like_wildcards_are_escaped_as_literals` | **PASS** |
-| **AC7** | Sách đã xoá mềm (`is_deleted=True`) bị loại khỏi mọi truy vấn và `total` | `test_ac7_deleted_books_excluded_everywhere` | **PASS** |
-| **AC8** | Ô tìm kiếm tên sách + dropdown thể loại mặc định `Tất cả thể loại` | Kiểm chứng trên `BooksAdminView.js` & trình duyệt thực tế | **PASS** |
-| **AC9** | Đổi filter về trang 1; chuyển trang giữ nguyên filter | Kiểm chứng trên `BooksAdminView.js`, `filterLogic.test.js` & trình duyệt | **PASS** |
-| **AC10** | Dropdown thể loại tìm kiếm từ backend có `limit`, giữ lựa chọn hiện tại, báo `Không tìm thấy thể loại` | `test_categories_search_normalization_and_limit` + `SearchableCategoryDropdown.js` | **PASS** |
-| **AC11** | Cột thể loại hiển thị tên thể loại (`category_name`) thay vì ID | `BookResponse.category_name` + hiển thị trong bảng `BooksAdminView.js` | **PASS** |
-| **AC12** | Debounce ~300ms cho keyword sách và thể loại + chống race condition | `createDebounce`, `createRaceGuard` (`AbortController` + token) trong `filterLogic.test.js` | **PASS** |
-| **AC13** | Rỗng do filter hiển thị `Không tìm thấy sách phù hợp`; không hiện khi đang loading | Kiểm chứng trên `BooksAdminView.js` & trình duyệt thực tế | **PASS** |
-| **AC14** | Nút `Xoá bộ lọc` đưa keyword về rỗng, thể loại về `Tất cả thể loại`, về trang 1 | Kiểm chứng trên `BooksAdminView.js` & trình duyệt thực tế | **PASS** |
+1. **Chuẩn hoá Unicode NFC & `trim()`:**
+   - Hàm `normalize_keyword(raw)` chuyển chuỗi về chuẩn dựng sẵn **Unicode NFC** (`unicodedata.normalize("NFC", str(raw))`), cắt khoảng trắng hai đầu bằng `.strip()`. Nếu kết quả rỗng (`""`), trả về `None` để bỏ filter.
+2. **Xử lý không phân biệt hoa/thường cho tiếng Việt có dấu (`Đ`/`đ`, `Ă`/`ă`, `Ơ`/`ơ`, `Ư`/`ư`):**
+   - Vì hàm `LOWER()` và toán tử `LIKE` mặc định của SQLite chỉ hạ chữ cho bảng mã ASCII (`A-Z`), hệ thống đăng ký hàm Python UDF `u_lower` / `u_casefold` trực tiếp vào kết nối SQLite qua `dbapi_connection.create_function("u_lower", 1, unicode_casefold)`.
+   - Khi truy vấn, cả cột dữ liệu (`Book.title`, `Book.author`, `Category.name`, `Reader.full_name`) và từ khoá đều được đưa qua `u_lower` trước khi so khớp `LIKE`.
+3. **Escape ký tự đại diện (`%`, `_`, `\`) thành ký tự literal:**
+   - Hàm `escape_like_literal()` thay `\` → `\\`, `%` → `\%`, `_` → `\_` và truy vấn SQLAlchemy luôn khai báo `.like(pattern, escape="\\")`.
 
 ---
 
-## 9. Hạn chế & Hướng phát triển
+### 4. Kiểm thử tự động (Automated Testing)
 
-1. **Hiệu năng tìm kiếm chuỗi con (`LIKE '%keyword%'`) khi dữ liệu lớn:**
-   - Truy vấn `LIKE '%...%'` dẫn đầu bằng ký tự đại diện không tận dụng được B-Tree index chuẩn, có thể cần quét toàn bảng khi số lượng đầu sách lên tới hàng trăm nghìn bản ghi.
-   - *Hướng phát triển:* Tích hợp SQLite FTS5 (Full-Text Search) hoặc PostgreSQL `pg_trgm` (GIN/GiST trigram index) cho tìm kiếm substring tốc độ cao.
-2. **Xác thực và phân quyền người dùng:**
-   - Hiện tại giao diện quản trị hoạt động trực tiếp với tài khoản thủ thư mặc định trong phiên làm việc.
-   - *Hướng phát triển:* Bổ sung hệ thống đăng nhập OAuth2/JWT và phân quyền RBAC giữa Thủ thư (`librarian`) và Độc giả (`member`).
-3. **Quản lý thêm/sửa đầu sách và đặt trước trực tuyến:**
-   - *Hướng phát triển:* Bổ sung giao diện CRUD hoàn chỉnh (Thêm/Sửa sách, Quản lý nhà xuất bản) và cổng tra cứu dành riêng cho độc giả đặt giữ sách.
+- **Tổng số test thực tế:**
+  - **Backend (`pytest`):** **35 passed**, 0 failed, 0 skipped (thời gian chạy ~4.9s).
+  - **Frontend (`node --test`):** **4 passed**, 0 failed.
+- **Phần chưa có automated test:** Tương tác DOM trực tiếp trên trình duyệt thật (được kiểm tra qua kịch bản kiểm thử thủ công ở mục 6).
+
+| Yêu cầu (NV / AC) | Tên hàm test trong `src/backend/tests/` & `src/frontend/tests/` | Kết quả |
+|---|---|---|
+| **AC1** (Tìm theo tên sách hoặc tác giả, hoa/thường, chữ `Đ`/`đ`, rỗng/whitespace) | `test_ac1_search_by_title_normalized_matches_seed_book` (5 case), `test_ac1_search_by_author_and_vietnamese_d_case_insensitive` (4 case), `test_ac1_empty_or_whitespace_keyword_does_not_filter` (3 case) | **PASS** |
+| **AC2** (Lọc sách theo `category_id`) | `test_ac2_filter_by_category_id` | **PASS** |
+| **AC3** (Kết hợp `q` + `category_id` theo logic AND) | `test_ac3_combine_keyword_and_category_uses_and_logic` | **PASS** |
+| **AC4** (`total`, `total_pages` và phân trang sau filter > 1 trang) | `test_ac4_total_and_pagination_calculated_after_filters` | **PASS** |
+| **AC5** (Không khớp keyword hoặc `category_id` không tồn tại → 200 + `items=[]`) | `test_ac5_non_matching_keyword_or_non_existent_category_returns_200_empty` | **PASS** |
+| **AC6** (Escape literal `%`, `_`, `100%`) | `test_ac6_special_like_wildcards_are_escaped_as_literals` | **PASS** |
+| **AC7** (Sách đã xoá mềm biến mất ở mọi truy vấn và `total`) | `test_ac7_deleted_books_excluded_everywhere` | **PASS** |
+| **AC10 Backend** (Tìm thể loại chuẩn hoá + `limit`) | `test_categories_search_normalization_and_limit` | **PASS** |
+| **AC9, AC12, UX5 Frontend Helpers** (Query builder, Debounce, Race guard, Date `dd/mm/yyyy`) | `filterLogic.test.js` (4 subtests) | **PASS** |
+| **NV1** (Mượn thành công; chặn khi thẻ khoá, bản sao hỏng, quá hạn, đủ 5 cuốn) | `test_nv1_borrow_success_updates_copy_and_sets_due_date`, `test_nv1_reject_inactive_reader_and_unavailable_copy`, `test_nv1_reject_when_reader_has_overdue_loan_or_reaches_max_5_loans` | **PASS** |
+| **NV2** (Transaction & chặn 2 phiếu chưa trả trên cùng 1 bản sao ở cả API và DB Index) | `test_nv2_cannot_create_second_active_loan_on_same_copy` | **PASS** |
+| **NV3** (Trả `normal`/`damaged`/`lost`; trả lần 2 → 409; tính phí phạt trả trễ) | `test_nv3_return_conditions_and_second_return_409` (3 case), `test_nv3_late_return_calculates_exact_fine` | **PASS** |
+| **NV4** (Gia hạn +7 ngày; chặn khi quá hạn, đủ 2 lần, hoặc đã trả) | `test_nv4_renew_loan_success_and_rejections` | **PASS** |
+| **NV5** (Nhận diện quá hạn tự động khi ghi đè hàm clock `get_today`) | `test_nv5_overdue_detection_follows_clock_override` | **PASS** |
+| **NV6** (Chặn đổi tay trạng thái bản sao sang/ra khỏi `'borrowed'`) | `test_nv6_manual_copy_status_change_restrictions` | **PASS** |
+| **NV7** (Chặn xoá sách/khoá độc giả khi còn sách chưa trả; bảo toàn lịch sử) | `test_nv7_block_delete_book_and_deactivate_reader_with_active_loans` | **PASS** |
+| **NV8** (Lịch sử mượn của độc giả, lọc trạng thái và phân trang) | `test_nv8_reader_loan_history_filtering_and_pagination` | **PASS** |
+| **NV9** (Thống kê tổng quan khớp dữ liệu seed) | `test_nv9_overview_statistics_match_seed_data` | **PASS** |
+
+---
+
+### 5. Ảnh ứng dụng đang chạy
+
+> **Ghi chú trung thực:** Ứng dụng đã khởi chạy thực tế tại `http://127.0.0.1:8000` (và `http://127.0.0.1:5173`), nhưng công cụ điều khiển trình duyệt tự động bị chặn do Chrome trên máy chưa có file `C:\Users\DELL\AppData\Local\Google\Chrome\User Data\DevToolsActivePort`. Dưới đây là 8 vị trí placeholder chuẩn để người dùng chụp màn hình trình duyệt và lưu vào `docs/screenshots/`:
+
+> 📷 **[CẦN CHÈN ẢNH — chưa chụp tự động do thiếu Chrome DevToolsActivePort]** `docs/screenshots/app_01_tong_quan.png` — Màn hình Tổng quan hiển thị 36 đầu sách, 79 bản sao theo 4 trạng thái, 9 phiếu đang mượn, 4 phiếu quá hạn, 11 độc giả hoạt động và Top 5 sách mượn nhiều nhất.
+
+> 📷 **[CẦN CHÈN ẢNH — chưa chụp tự động do thiếu Chrome DevToolsActivePort]** `docs/screenshots/app_02_sach_tim_kiem.png` — Màn hình Sách khi tìm kiếm theo tên sách (`Python`) hoặc theo tác giả có chữ Đ/đ (`Đặng Thanh Tùng`).
+
+> 📷 **[CẦN CHÈN ẢNH — chưa chụp tự động do thiếu Chrome DevToolsActivePort]** `docs/screenshots/app_03_sach_loc_the_loai.png` — Màn hình Sách khi gõ tìm trong combobox thể loại và chọn `Công nghệ thông tin` (`Tìm thấy 12 sách`, phân làm 2 trang).
+
+> 📷 **[CẦN CHÈN ẢNH — chưa chụp tự động do thiếu Chrome DevToolsActivePort]** `docs/screenshots/app_04_muon_sach.png` — Màn hình Mượn / Trả khi dùng ô gõ tìm chọn độc giả và bản sao còn trong kho để lập phiếu mượn mới.
+
+> 📷 **[CẦN CHÈN ẢNH — chưa chụp tự động do thiếu Chrome DevToolsActivePort]** `docs/screenshots/app_05_tra_sach.png` — Màn hình xác nhận Trả sách với tuỳ chọn tình trạng bản sao (`Bình thường`, `Hư hỏng`, `Thất lạc`) và hiển thị phí phạt quá hạn.
+
+> 📷 **[CẦN CHÈN ẢNH — chưa chụp tự động do thiếu Chrome DevToolsActivePort]** `docs/screenshots/app_06_doc_gia_lich_su.png` — Màn hình Độc giả khi mở bảng Lịch sử mượn sách của độc giả `Nguyễn Minh Tuấn (DG001)`.
+
+> 📷 **[CẦN CHÈN ẢNH — chưa chụp tự động do thiếu Chrome DevToolsActivePort]** `docs/screenshots/app_07_empty_state.png` — Màn hình Sách khi nhập từ khoá không khớp hiển thị `Không tìm thấy sách phù hợp` kèm gợi ý nhấn `Xoá bộ lọc`.
+
+> 📷 **[CẦN CHÈN ẢNH — chưa chụp tự động do thiếu Chrome DevToolsActivePort]** `docs/screenshots/app_08_mobile.png` — Giao diện ứng dụng ở chế độ màn hình hẹp `~375px` (thanh bộ lọc tự động xuống dòng).
+
+---
+
+### 6. Kịch bản kiểm thử thủ công (Manual UI Verification Guide)
+
+Do chưa kiểm tay qua Chrome DevTools tự động, bảng dưới đây là **hướng dẫn kiểm thử thủ công** sử dụng dữ liệu có thật trong `src/backend/seed_data.py`:
+
+| Bước | Thao tác trên giao diện (`http://127.0.0.1:8000`) | Kết quả kỳ vọng |
+|---|---|---|
+| 1 | Mở tab **Tổng quan** | Hiển thị Tổng đầu sách: `36`, Bản sao: `Còn trong kho: 68`, `Đang mượn: 9`, `Hư hỏng: 1`, `Thất lạc: 1`; Phiếu quá hạn: `4`; Độc giả hoạt động: `11`; Top 1 sách mượn nhiều: *"Lập trình Python cơ bản"* (`3 lượt`). |
+| 2 | Mở tab **Sách**, gõ `đặng thanh tùng` (chữ thường, có dấu `đ`) và nhấn `Enter` | Tìm thấy ngay đầu sách *"Thiết kế Cơ sở dữ liệu Quan hệ"* của tác giả **Đặng Thanh Tùng** (`Tìm thấy 1 sách`). |
+| 3 | Nhấn vào combobox **Thể loại**, gõ `Công nghệ`, chọn `Công nghệ thông tin`, xoá ô tìm tên sách | Hiển thị `Tìm thấy 12 sách` thuộc thể loại `Công nghệ thông tin` (Trang 1 hiển thị 10 sách, Trang 2 hiển thị 2 sách). Chuyển sang Trang 2 vẫn giữ nguyên thể loại `Công nghệ thông tin`. |
+| 4 | Gõ thêm từ khoá `Python` khi đang lọc `Công nghệ thông tin` | Hiển thị `Tìm thấy 2 sách` (*"Lập trình Python cơ bản"* và *"Lập trình Python nâng cao cho Web"*), không hiển thị cuốn *"Phân tích dữ liệu với Python và Pandas"* (thuộc `Khoa học dữ liệu & AI`). |
+| 5 | Gõ `SachKhongTonTai999` rồi nhấn nút **✕ Xoá bộ lọc** | Khi gõ hiện `Không tìm thấy sách phù hợp`. Khi nhấn `Xoá bộ lọc`, ô tìm kiếm về rỗng, thể loại về `Tất cả thể loại`, trang về 1 (`Tìm thấy 36 sách`) và nút `Xoá bộ lọc` bị `disabled`. |
+| 6 | Nhấn nút **Bản sao (4)** ở dòng sách *"Lập trình Python cơ bản"* | Mở bảng 4 bản sao (`BS-001-01` đang mượn; `BS-001-02`..`04` còn trong kho). Bản sao `BS-001-01` không có nút đổi trạng thái thủ công (NV6). |
+| 7 | Mở tab **Mượn / Trả**, chọn độc giả `DG004 - Lê Hoàng Bách` (đang có phiếu quá hạn) và bản sao `BS-001-02`, nhấn **Mượn sách** | Hệ thống chặn và hiển thị thông báo lỗi tiếng Việt: *"Độc giả đang có phiếu mượn quá hạn chưa trả, vui lòng trả sách quá hạn trước khi mượn mới."* (NV1). |
+| 8 | Chọn độc giả `DG010 - Ngô Gia Bảo` và bản sao `BS-001-02`, nhấn **Mượn sách** | Tạo phiếu mượn thành công, hiển thị hạn trả sau 14 ngày (`dd/mm/yyyy`), bản sao `BS-001-02` chuyển sang `Đang mượn`. |
+| 9 | Tại bảng phiếu mượn, lọc trạng thái **Quá hạn (Cần thu hồi)**, nhấn **Trả sách** ở phiếu quá hạn 6 ngày của `Lê Hoàng Bách (DG004)`, chọn tình trạng `Hư hỏng` | Hộp thoại hỏi xác nhận trước khi ghi nhận hư hỏng (UX4); sau khi xác nhận, thông báo trả thành công kèm phí phạt `6.000 đ` và bản sao `BS-004-01` chuyển sang `Hư hỏng` (NV3). |
+| 10 | Mở tab **Độc giả**, nhấn **Lịch sử mượn** ở dòng `Nguyễn Minh Tuấn (DG001)` | Hiển thị bảng lịch sử 3 phiếu mượn của `DG001` (1 phiếu đang mượn, 2 phiếu đã trả), cho phép lọc theo trạng thái phiếu. |
+
+---
+
+## PHẦN III — QUÁ TRÌNH SỬ DỤNG CÔNG CỤ AI
+
+### 1. Chuẩn bị môi trường (Ảnh do người dùng tự chụp)
+
+> 📷 **[CẦN CHÈN ẢNH — người dùng tự chụp]** `docs/screenshots/ai_01_aistudio_login.png` — Đăng nhập Google AI Studio.
+
+> 📷 **[CẦN CHÈN ẢNH — người dùng tự chụp]** `docs/screenshots/ai_02_antigravity_project.png` — Mở đúng thư mục dự án `Lab_QLThuVien_[MSSV]_[HoTen]` trong Antigravity IDE.
+
+> 📷 **[CẦN CHÈN ẢNH — người dùng tự chụp]** `docs/screenshots/ai_03_prompt.png` — Màn hình gửi Prompt yêu cầu xây dựng hệ thống Quản lý Thư viện trong Antigravity IDE.
+
+> 📷 **[CẦN CHÈN ẢNH — người dùng tự chụp]** `docs/screenshots/ai_04_plan.png` — Màn hình kế hoạch thực hiện (Task Checklist / Steps) và bảng khoảng cách của AI Agent.
+
+> 📷 **[CẦN CHÈN ẢNH — người dùng tự chụp]** `docs/screenshots/ai_05_tests.png` — Màn hình Terminal chạy 35 automated tests (`pytest`) và 4 frontend tests (`npm test`) đều PASS.
+
+> 📷 **[CẦN CHÈN ẢNH — người dùng tự chụp]** `docs/screenshots/ai_06_code_diff.png` — Màn hình đối chiếu thay đổi mã nguồn (`git status` / `git diff` / `git log`).
+
+> 📷 **[CẦN CHÈN ẢNH — người dùng tự chụp]** `docs/screenshots/ai_07_aistudio_usage.png` — Màn hình sử dụng Google AI Studio (nếu người dùng có sử dụng).
+
+---
+
+### 2. Quy trình làm việc với AI (Tổng hợp từ `docs/nhat_ky_AI.md`)
+
+Chi tiết toàn bộ nhật ký làm việc theo từng Phase được lưu tại file [docs/nhat_ky_AI.md](file:///d:/Lab_QLThuVien_29211555982_DANGVANANH/docs/nhat_ky_AI.md). Tóm tắt quá trình gồm sự điều chỉnh quan trọng giữa hai phiên:
+
+1. **Phiên đầu (Làm theo prompt hẹp ban đầu):**
+   - Ở phiên đầu tiên, hệ thống được khởi tạo với phạm vi chỉ tập trung vào *Tìm kiếm sách theo tên sách + Lọc thể loại* (16 đầu sách, 8 thể loại, mượn/trả đơn giản trực tiếp trên bảng `books` và `borrow_records`, chưa quản lý từng bản sao `book_copies`, chưa có gia hạn hay quy tắc chặn NV1–NV9).
+2. **Phiên hiện tại (Kiểm toán, điều chỉnh lệch đề và nâng cấp toàn diện theo đề LAB 02):**
+   - **Phase 0 (Kiểm toán & Sao lưu):** AI thực hiện sao lưu toàn bộ working tree ra thư mục tạm `_backup_truoc_lab02`, chạy baseline 17 test cũ (`17 passed`) và lập Bảng khoảng cách đối chiếu với F1–F11, NV1–NV9, AC1–AC14.
+   - **Phase 1–2 (Thiết kế & Migration cộng thêm không mất dữ liệu):** Bổ sung bảng `book_copies`, `readers`, `loans` kèm Partial Unique Index `uq_loans_active_copy`, giữ nguyên bảng cũ để tương thích ngược, nâng dữ liệu mẫu lên **10 thể loại, 36 đầu sách tiếng Việt có dấu, 79 bản sao, 12 độc giả, 22 phiếu mượn**.
+   - **Phase 3–4 (Triển khai Backend F1–F11, NV1–NV9 & 35 Automated Tests):** Mở rộng tìm kiếm sách sang khớp **tên sách HOẶC tác giả** (`u_casefold` chuẩn Unicode NFC cho cả chữ `Đ`/`đ`), cài đặt đầy đủ NV1–NV9 và nâng bộ test lên **35 test cases** pass 100%.
+   - **Phase 5–10 (Frontend 4 màn hình, Kiểm chứng bản sạch & Đóng gói):** Hoàn thiện 4 màn hình quản trị (Tổng quan, Sách, Độc giả, Mượn/Trả), kiểm chứng chạy từ thư mục sạch theo `README.md`, đóng gói file zip và đẩy lên GitHub.
+
+---
+
+### 3. Đánh giá quá trình ứng dụng AI (Điểm mạnh, Hạn chế & Các lỗi thực tế đã xử lý)
+
+- **Điểm mạnh:**
+  - Phân rã nhanh bài toán thành bảng khoảng cách rõ ràng, thiết kế schema có ràng buộc toàn vẹn ở mức CSDL (`CHECK`, `FOREIGN KEY`, Partial Unique Index `WHERE returned_at IS NULL`).
+  - Viết bộ kiểm thử tích hợp (`pytest`) bao phủ toàn bộ các ca biên (chữ `Đ`/`đ`, ký tự `%`, `_`, ghi đè đồng hồ `set_today_override` để test quá hạn và phí phạt).
+- **Những lỗi kỹ thuật AI thực sự gặp phải và cách khắc phục:**
+  1. **Hạn chế `LOWER()` và `LIKE` mặc định của SQLite với tiếng Việt có dấu:** SQLite mặc định chỉ chuyển chữ hoa/thường cho ký tự ASCII (`A-Z`), khiến từ khoá `"ĐẶNG THANH TÙNG"` hoặc `"đoàn giỏi"` không khớp đúng chữ `"Đ"`/`"đ"`. *Cách sửa:* Đăng ký hàm Python UDF `u_lower` sử dụng `unicodedata.normalize("NFC", val).casefold()` vào mọi kết nối SQLite trong `app/database.py`.
+  2. **Tương tác giữa quy tắc NV7 (chặn xoá sách có bản sao đang mượn) và test AC7 (xoá mềm sách):** Khi áp dụng NV7, đầu sách *"Lập trình Python cơ bản"* có bản sao `BS-001-01` đang được độc giả `DG001` mượn nên gọi `DELETE /api/books/1` ngay sẽ bị chặn HTTP 400. *Cách sửa:* Cập nhật kịch bản test AC7 thực hiện trả phiếu đang mượn của đầu sách đó trước khi gọi API xoá mềm, vừa chứng minh đúng NV7 vừa kiểm chứng trọn vẹn AC7.
+  3. **Kết nối công cụ trình duyệt tự động:** Browser Subagent báo lỗi `ENOENT: DevToolsActivePort` do Chrome trên máy người dùng không mở cổng remote debugging. *Cách xử lý:* Tuân thủ quy tắc trung thực, không giả lập ảnh, tạo đầy đủ placeholder hướng dẫn rõ từng ảnh cần chụp.
+
+---
+
+### 4. Khung ghi nhận sử dụng Google AI Studio (Dành cho sinh viên tự điền nếu có sử dụng)
+
+> *(Lưu ý: Nếu bạn có sử dụng Google AI Studio ở Phần 1 của bài Lab để phân tích đề hoặc thử nghiệm prompt, hãy điền bổ sung thông tin thực tế vào khung dưới đây)*
+> - **Model đã chọn trên Google AI Studio:** `<Điền tên model, ví dụ: Gemini 2.5 Pro / Gemini 2.0 Flash>`
+> - **Prompt đã thử nghiệm trên Google AI Studio:** `<Dán prompt bạn đã nhập trên giao diện web Google AI Studio>`
+> - **Kết quả nhận được & Cách áp dụng vào dự án:** `<Mô tả ngắn kết quả phân tích hoặc sinh dữ liệu mẫu từ Google AI Studio>`
+
+---
+
+## PHẦN IV — HẠN CHẾ & HƯỚNG PHÁT TRIỂN
+
+1. **Chưa có cơ chế Đăng nhập và Phân quyền theo phiên người dùng:**
+   - Theo phạm vi đề bài (mục *Không làm*), ứng dụng hiện mở trực tiếp giao diện dành cho Thủ thư mà chưa yêu cầu đăng nhập.
+   - *Hướng phát triển:* Bổ sung xác thực JWT/Session, phân tách quyền giữa Thủ thư (toàn quyền) và Độc giả (chỉ tra cứu sách và xem lịch sử cá nhân).
+2. **Hiệu năng tìm kiếm chuỗi con (`LIKE '%keyword%'`) khi quy mô dữ liệu rất lớn:**
+   - Việc dùng hàm UDF `u_lower(...) LIKE '%...%'` hoạt động rất nhanh (< 5ms) với quy mô vài nghìn đầu sách của thư viện trường học, nhưng sẽ phải quét toàn bảng (full table scan) nếu dữ liệu lên tới hàng triệu bản ghi.
+   - *Hướng phát triển:* Kết hợp bảng chỉ mục toàn văn SQLite **FTS5** (Full-Text Search) hoặc chuyển sang PostgreSQL với chỉ mục Trigram (`pg_trgm`).
+3. **Mở rộng tiện ích tự động hoá:**
+   - *Hướng phát triển:* Tích hợp quét mã vạch (`barcode`) qua camera/máy quét USB, xuất phiếu mượn/biên lai thu tiền phạt ra PDF và gửi email nhắc trả sách tự động trước hạn 2 ngày.

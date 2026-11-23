@@ -5,13 +5,19 @@ import {
   createDebounce,
   createRaceGuard,
 } from "../src/utils/bookSearchHelper.js";
+import { formatDateVN } from "../src/types/index.js";
 
-test("buildBooksQueryString trims keyword and includes category_id and page", () => {
-  const qs1 = buildBooksQueryString({ keyword: "  python  ", categoryId: 2, page: 1, pageSize: 5 });
-  assert.equal(qs1, "keyword=python&category_id=2&page=1&page_size=5");
+test("buildBooksQueryString trims keyword into q parameter and includes category_id and page", () => {
+  const qs1 = buildBooksQueryString({ keyword: "  python  ", categoryId: 2, page: 1, pageSize: 10 });
+  assert.equal(qs1, "q=python&category_id=2&page=1&page_size=10");
 
-  const qs2 = buildBooksQueryString({ keyword: "   ", categoryId: null, page: 3, pageSize: 5 });
-  assert.equal(qs2, "page=3&page_size=5");
+  const qs2 = buildBooksQueryString({ keyword: "   ", categoryId: null, page: 3, pageSize: 10 });
+  assert.equal(qs2, "page=3&page_size=10");
+});
+
+test("formatDateVN converts ISO YYYY-MM-DD to dd/mm/yyyy", () => {
+  assert.equal(formatDateVN("2026-11-23"), "23/11/2026");
+  assert.equal(formatDateVN(null), "—");
 });
 
 test("createDebounce coalesces rapid calls and supports flush/cancel", async () => {
@@ -30,7 +36,6 @@ test("createDebounce coalesces rapid calls and supports flush/cancel", async () 
   assert.equal(callCount, 1);
   assert.equal(lastArg, "python");
 
-  // Flush executes immediately and cancels pending timer
   debounced("pending");
   debounced.flush("immediate");
   assert.equal(callCount, 2);

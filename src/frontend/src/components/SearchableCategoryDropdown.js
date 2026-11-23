@@ -7,18 +7,22 @@ import {
 } from "../utils/bookSearchHelper.js";
 
 /**
- * Component Dropdown Thể loại có tìm kiếm từ Backend (AC8, AC10, AC12, UX1, UX2, UX4, UX5, UX6).
- * - Mặc định: "Tất cả thể loại" (id: null)
- * - Gõ keyword: debounce 300ms gọi GET /api/categories?keyword=...&limit=15
- * - Giữ nguyên thể loại đang chọn khi tìm kiếm thể loại khác (kể cả khi không nằm trong kết quả tìm hiện tại)
- * - Hỗ trợ bàn phím đầy đủ: ArrowDown, ArrowUp, Enter, Escape
+ * Component Combobox Thể loại có tìm kiếm từ Backend (AC8, AC10, AC12, UX1, UX2, UX4, UX5, UX6).
+ * Tái sử dụng được ở cả thanh Bộ lọc danh sách sách (allowAll=true, mặc định "Tất cả thể loại")
+ * và trong Form Thêm/Sửa đầu sách (allowAll=false, chọn 1 thể loại cụ thể).
  */
-export function createSearchableCategoryDropdown({ onSelect }) {
+export function createSearchableCategoryDropdown({
+  onSelect,
+  allowAll = true,
+  labelText = "Thể loại",
+  defaultText = "Tất cả thể loại",
+  idPrefix = "category-dropdown",
+}) {
   const container = document.createElement("div");
   container.className = "category-dropdown";
 
   let isOpen = false;
-  let selectedCategory = { id: null, name: "Tất cả thể loại" };
+  let selectedCategory = { id: null, name: allowAll ? defaultText : "Chọn thể loại..." };
   let searchKeyword = "";
   let categories = [];
   let isLoading = false;
@@ -26,21 +30,23 @@ export function createSearchableCategoryDropdown({ onSelect }) {
   let activeIndex = -1;
 
   const raceGuard = createRaceGuard();
+  const labelId = `${idPrefix}-label`;
+  const triggerId = `${idPrefix}-trigger`;
 
   container.innerHTML = `
-    <label class="filter-label" id="category-dropdown-label" for="category-dropdown-trigger">
-      Thể loại
+    <label class="filter-label" id="${labelId}" for="${triggerId}">
+      ${labelText}
     </label>
     <div class="dropdown-control">
       <button
         type="button"
-        id="category-dropdown-trigger"
+        id="${triggerId}"
         class="dropdown-trigger"
         aria-haspopup="listbox"
         aria-expanded="false"
-        aria-labelledby="category-dropdown-label category-dropdown-trigger"
+        aria-labelledby="${labelId} ${triggerId}"
       >
-        <span class="dropdown-selected-text">Tất cả thể loại</span>
+        <span class="dropdown-selected-text">${selectedCategory.name}</span>
         <span class="dropdown-arrow" aria-hidden="true">▾</span>
       </button>
       <div class="dropdown-menu hidden" role="dialog" aria-label="Chọn thể loại sách">
@@ -69,9 +75,8 @@ export function createSearchableCategoryDropdown({ onSelect }) {
   function getDisplayOptions() {
     const trimmed = searchKeyword.trim();
     const list = [];
-    // Luôn cho phép chọn lại "Tất cả thể loại" khi chưa gõ từ khoá tìm thể loại
-    if (trimmed === "") {
-      list.push({ id: null, name: "Tất cả thể loại" });
+    if (allowAll && trimmed === "") {
+      list.push({ id: null, name: defaultText });
     }
     for (const c of categories) {
       list.push({ id: c.id, name: c.name });
@@ -162,7 +167,7 @@ export function createSearchableCategoryDropdown({ onSelect }) {
     const changed = selectedCategory.id !== opt.id;
     selectedCategory = { id: opt.id, name: opt.name };
     selectedTextEl.textContent = opt.name;
-    triggerBtn.classList.toggle("has-filter", opt.id !== null);
+    triggerBtn.classList.toggle("has-filter", allowAll && opt.id !== null);
     closeMenu();
     triggerBtn.focus();
     if (changed && typeof onSelect === "function") {
@@ -175,7 +180,6 @@ export function createSearchableCategoryDropdown({ onSelect }) {
     isOpen = true;
     triggerBtn.setAttribute("aria-expanded", "true");
     menuEl.classList.remove("hidden");
-    // Giữ lựa chọn hiện tại, reset ô tìm thể loại để hiển thị danh sách từ backend
     searchKeyword = "";
     searchInput.value = "";
     loadCategories("");
@@ -251,10 +255,18 @@ export function createSearchableCategoryDropdown({ onSelect }) {
     getSelectedCategory() {
       return { ...selectedCategory };
     },
+    setSelectedCategory(cat) {
+      selectedCategory = {
+        id: cat && cat.id !== undefined ? cat.id : null,
+        name: (cat && cat.name) || (allowAll ? defaultText : "Chọn thể loại..."),
+      };
+      selectedTextEl.textContent = selectedCategory.name;
+      triggerBtn.classList.toggle("has-filter", allowAll && selectedCategory.id !== null);
+    },
     resetToDefault() {
       debouncedSearch.cancel();
-      selectedCategory = { id: null, name: "Tất cả thể loại" };
-      selectedTextEl.textContent = "Tất cả thể loại";
+      selectedCategory = { id: null, name: allowAll ? defaultText : "Chọn thể loại..." };
+      selectedTextEl.textContent = selectedCategory.name;
       triggerBtn.classList.remove("has-filter");
       searchKeyword = "";
       searchInput.value = "";

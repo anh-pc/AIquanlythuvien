@@ -1,0 +1,14 @@
+{
+  "name": "aiquanlythuvien-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Giao diện Quản trị Thư viện AIquanlythuvien",
+  "scripts": {
+    "dev": "node scripts/server.js",
+    "start": "node scripts/server.js",
+    "build": "node scripts/build.js",
+    "lint": "node scripts/lint.js",
+    "test": "node --test tests/*.test.js"
+  }
+}
